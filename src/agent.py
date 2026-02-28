@@ -15,11 +15,11 @@ def generate_sql(user_query: str, system_prompt: str):
     # Combine the instructions and the query
     prompt = f"{system_prompt}\n\nUser Question: {user_query}\n\nSQL:"
     
-    # We use 'gpt-4o' model for SQL generation, which is optimized for code tasks. 
+    # We use 'mistral-large2' model for SQL generation, which is optimized for code tasks. 
     # The COMPLETE function will return the generated SQL directly.
     cortex_sql = f"""
         SELECT SNOWFLAKE.CORTEX.COMPLETE(
-            'gpt-4o', 
+            'mistral-large2', 
             {repr(prompt)}
         )
     """
