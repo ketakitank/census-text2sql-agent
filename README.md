@@ -1,0 +1,50 @@
+# Census Text-to-SQL Agent (v1.0)
+
+Introducing the **Census Text-to-SQL Agent** that translates Natural Language to Snowflake SQL using Snowflake Cortex AI to query the [US Open Census Dataset](https://urldefense.com/v3/__https://app.snowflake.com/marketplace/listing/GZSNZ2UNN0/safegraph-us-open-census-data-neighborhood-insights-free-dataset__;!!Mih3wA!AG7RCvE7t1U1XHb-7iplJr8rPXnz4G9mOp6yyv5_DD06CjntJ7XWjZpOMqTi-9A-ePe2m-ZMumwmLa3r5bxN8b4LlA8$) available for free on Snowflake marketplace.
+
+
+## Key Features
+1. Heuristically maps queries to the correct Census Subject Tables and specific years (2019, 2020 available in the marketplace)
+2. Leverages `mistral-large2` via the `SNOWFLAKE.CORTEX.AI_COMPLETE` to ensure performant and safe sql generation
+3. Post processes LLM hallucinated outputs to handle failures when output contains markdown, escaped quotes, newlines etc.
+4. SQLAlchemy Data access ensures robust connection pooling and URL encoded connection handling to prevent failures 
+
+## Quick Start
+1. Pre-requisites 
+    * Python 3.9+
+    * Snowflake account with access to `US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET`
+
+2. Installation Steps
+``` 
+    git clone <url>
+    cd census-text2sql-agent
+    pip install -r requirements.txt
+```
+
+3. Configuration Settings
+
+    Create an `.env` file in the root directory by following [`.env.example`](./.env.example) file
+
+4. Usage 
+
+    Run the agent via the CLI using the `-v` flag to switch verbose to True and follow through the agent's though process.
+    ```
+        # Sample query
+        python cli.py "What is the population of San Diego in 2020?"
+
+        # Verbose set to True
+        python cli.py "Median income in Cook County for 2019" -v
+    ```
+
+## Project Structure
+```
+    .
+    ├── cli.py             # CLI Entry point & Argument Parsing
+    ├── main.py            # Core Orchestration Logic
+    ├── src/
+    │   ├── agent.py       # Cortex AI Inference & SQL Sanitization
+    │   ├── database.py    # SQLAlchemy Connection & Execution
+    │   ├── router.py      # Heuristic Mapping to route to tables
+    │   └── prompt.py      # System Prompt Engineering
+    └── requirements.txt
+```
