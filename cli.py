@@ -1,5 +1,6 @@
 import argparse
 from main import process_census_query
+import logging
 
 
 def main():
@@ -50,4 +51,7 @@ def _print_response(response: dict) -> None:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
     main()
