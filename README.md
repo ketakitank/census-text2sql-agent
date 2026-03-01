@@ -147,10 +147,14 @@ pytest tests/
 ### 1. Replace keyword mapping with embedding-based routing
 This would ensure synonyms for income like wages etc. would still map to the right subject code using semantic similarity 
 
-### 2. Schema Discovery
-Currently the routing for subject code is hardcoded, if I had mroe time I would build a route map dynamically (just one time), from the live schema. This way in case new columns are added to the database the agent would stay in sync
+### 2. ~~Schema Discovery~~
+~~Currently the routing for subject code is hardcoded, if I had mroe time I would build a route map dynamically (just one time), from the live schema. This way in case new columns are added to the database the agent would stay in sync~~
 
-### 3. Multi table joins 
-Currently the agent is unable to query multiple tables, for eg: income for various ethinicites in a particular county or state. 
+### ~~3. Multi table joins~~
+~~Currently the agent is unable to query multiple tables, for eg: income for various ethinicites in a particular county or state.~~
 
-To fix this, the router would need to detect when a query spans multiple subject codes (e.g., `B19` for income + `B02` for race) and return all matched codes instead of just one. The system prompt would then instruct the LLM to `JOIN` those tables on their shared `GEOID` column. The main challenge is that the LLM needs to know which columns exist in each table to write a valid join, so this would also depend on having some form of schema discovery (point 2 above) in place first
+~~To fix this, the router would need to detect when a query spans multiple subject codes (e.g., `B19` for income + `B02` for race) and return all matched codes instead of just one. The system prompt would then instruct the LLM to `JOIN` those tables on their shared `GEOID` column. The main challenge is that the LLM needs to know which columns exist in each table to write a valid join, so this would also depend on having some form of schema discovery (point 2 above) in place first~~
+
+**Strikethroughs Implemented** 
+
+Router can now detect multiple subject codes per query, merges inherited tables across conversation turns, and the prompt injects multi-table JOIN instructions with aliased schema hints 
