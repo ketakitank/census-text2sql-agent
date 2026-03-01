@@ -140,4 +140,5 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
         return {"answer": "success", "sql": sql, "results": results, "error": None}
 
     except Exception as e:
+        logger.error(f"[Query Execution Error]: {e}", exc_info=True)
         return {"answer": None, "sql": sql, "results": None, "error": str(e)}
