@@ -100,10 +100,10 @@ def extract_geo_entities(user_query: str) -> tuple[str | None, str | None]:
     Extracts (state_abbr, county_name) from a natural language query.
 
     4-stage pipeline:
-      1. City dict   → deterministic, handles top 20 US cities
-      2. State dict  → deterministic, handles all 50 state full names
-      3. Positional  → regex anchored to geo prepositions (in/for/of/from)
-      4. Cortex LLM  → fallback for truly ambiguous/unknown locations
+      1. City dict   => deterministic, handles top 20 US cities
+      2. State dict  => deterministic, handles all 50 state full names
+      3. Positional  => regex anchored to geo prepositions (in/for/of/from)
+      4. Cortex LLM  => fallback for truly ambiguous/unknown locations
 
     Args:
         user_query (str): The natural language query from the user.
@@ -127,15 +127,15 @@ def extract_geo_entities(user_query: str) -> tuple[str | None, str | None]:
 
     # --- Stage 3: Positional abbreviation matching ---
     # Only matches abbreviations that FOLLOW a geographic preposition
-    # "income in FL in 2019" → matches "in FL" → FL
-    # "income in IN in 2019" → matches "in IN" → IN
+    # "income in FL in 2019" => matches "in FL" => FL
+    # "income in IN in 2019" => matches "in IN" => IN
     geo_matches = GEO_TRIGGER_PATTERN.findall(user_query)
     valid_geo = [m.upper() for m in geo_matches if m.upper() in STATE_ABBR_SET]
 
     if valid_geo:
         # Filter out year-adjacent matches: "in 2019" won't be 2 letters, safe
         # If multiple matches, take the last one (state usually mentioned last)
-        # Eg: "population in CA and TX in 2020" → matches ["CA", "TX"] → returns "TX"
+        # Eg: "population in CA and TX in 2020" => matches ["CA", "TX"] => returns "TX"
         # For multiple matches we could consider more complex logic (e.g., proximity to subject keywords), but for now we take the last valid match as the most likely intended location.
         # TODO: Add ability to detect multiple locations and return a list of candidates instead of just one.
         candidate = valid_geo[-1]

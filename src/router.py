@@ -1,25 +1,151 @@
 import re
 from src.extractor import extract_geo_entities
 from src.geography import resolve_fips_prefix
+from src.schema_discovery import SUBJECT_TABLES
 
 # Mapping keywords to the Census Subject Codes based on the Snowflake schema discovered during exploration
 SUBJECT_MAP = {
+    # B01 = Age & Sex
     "population": "B01",
     "age": "B01",
     "sex": "B01",
     "gender": "B01",
+    "male": "B01",
+    "female": "B01",
+    # B02 = Race
     "race": "B02",
+    "white": "B02",
+    "black": "B02",
+    "asian": "B02",
+    "pacific islander": "B02",
+    "american indian": "B02",
+    "multiracial": "B02",
+    # B03 = Hispanic/Latino
     "ethnicity": "B03",
-    "income": "B19",
-    "earnings": "B20",
-    "poverty": "B17",
-    "education": "B15",
-    "employment": "B23",
-    "housing": "B25",
+    "hispanic": "B03",
+    "latino": "B03",
+    # B07 = Geographic Mobility
+    "mobility": "B07",
+    "migration": "B07",
+    "moved": "B07",
+    "movers": "B07",
+    "relocation": "B07",
+    # B08 = Commuting
     "commute": "B08",
-    "health": "B27",
-    "internet": "B28",
+    "commuting": "B08",
+    "travel time": "B08",
+    "transportation": "B08",
+    "drove": "B08",
+    "carpool": "B08",
+    "work from home": "B08",
+    # B09 = Children
+    "children": "B09",
+    "child": "B09",
+    "kids": "B09",
+    "minors": "B09",
+    # B11 = Household Type
+    "household": "B11",
+    "family": "B11",
+    "single parent": "B11",
+    "living alone": "B11",
+    # B12 = Marital Status
+    "marital": "B12",
+    "married": "B12",
+    "divorced": "B12",
+    "widowed": "B12",
+    "single": "B12",
+    # B14 = School Enrollment
+    "school": "B14",
+    "enrollment": "B14",
+    "enrolled": "B14",
+    "student": "B14",
+    # B15 = Education Attainment
+    "education": "B15",
+    "degree": "B15",
+    "college": "B15",
+    "bachelor": "B15",
+    "graduate": "B15",
+    "high school": "B15",
+    "diploma": "B15",
+    "dropout": "B15",
+    # B16 = Language
+    "language": "B16",
+    "english": "B16",
+    "spanish": "B16",
+    "bilingual": "B16",
+    "foreign language": "B16",
+    # B17 = Poverty
+    "poverty": "B17",
+    "poor": "B17",
+    "below poverty": "B17",
+    # B19 = Income
+    "income": "B19",
+    "household income": "B19",
+    "per capita": "B19",
+    "wealthy": "B19",
+    "rich": "B19",
+    # B20 = Earnings
+    "earnings": "B20",
+    "wages": "B20",
+    "salary": "B20",
+    "pay": "B20",
+    # B21 = Veteran Status
     "veteran": "B21",
+    "military": "B21",
+    "armed forces": "B21",
+    "service member": "B21",
+    # B22 = SNAP / Food Stamps
+    "snap": "B22",
+    "food stamp": "B22",
+    "food assistance": "B22",
+    "ebt": "B22",
+    # B23 = Employment
+    "employment": "B23",
+    "employed": "B23",
+    "unemployed": "B23",
+    "unemployment": "B23",
+    "labor force": "B23",
+    "jobs": "B23",
+    "work": "B23",
+    "worker": "B23",
+    # B24 = Occupation
+    "occupation": "B24",
+    "industry": "B24",
+    "profession": "B24",
+    "blue collar": "B24",
+    "white collar": "B24",
+    # B25 = Housing
+    "housing": "B25",
+    "rent": "B25",
+    "home value": "B25",
+    "homeowner": "B25",
+    "renter": "B25",
+    "vacancy": "B25",
+    "vacant": "B25",
+    "mortgage": "B25",
+    "apartment": "B25",
+    # B27 = Health Insurance
+    "health": "B27",
+    "insurance": "B27",
+    "uninsured": "B27",
+    "medicaid": "B27",
+    "medicare": "B27",
+    "covered": "B27",
+    # B28 = Internet Access
+    "internet": "B28",
+    "broadband": "B28",
+    "online": "B28",
+    "wifi": "B28",
+    "connected": "B28",
+    # B29 = Voting Age Population
+    "voting": "B29",
+    "voter": "B29",
+    "citizen": "B29",
+    "electorate": "B29",
+    # B99 = Allocation / Imputation Flags
+    "imputation": "B99",
+    "allocation": "B99",
+    "flag": "B99",
 }
 
 AGGREGATE_KEYWORDS = ["total", "sum", "average", "avg", "mean", "aggregate"]
@@ -76,7 +202,9 @@ def route_query(
     matched_codes = []
     for keyword, code in SUBJECT_MAP.items():
         if keyword in original_query.lower():
-            if code not in matched_codes:
+            if (
+                code not in matched_codes and code in SUBJECT_TABLES
+            ):  # Only consider codes that have corresponding tables in the schema
                 matched_codes.append(code)
 
     # Fall back to prior or default if nothing matched

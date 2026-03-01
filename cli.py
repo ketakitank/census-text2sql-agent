@@ -2,6 +2,9 @@ import argparse
 from main import process_census_query
 import logging
 
+# Suppress noisy Snowflake connector INFO logs in CLI as well
+logging.getLogger("snowflake.connector").setLevel(logging.WARNING)
+
 
 def main():
     parser = argparse.ArgumentParser(
