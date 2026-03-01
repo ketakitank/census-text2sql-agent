@@ -5,3 +5,4 @@ streamlit
 ruff
 sqlalchemy
 snowflake-sqlalchemy
+pytest
