@@ -72,23 +72,32 @@ def route_query(
     requested_year = year_match.group(0) if year_match else "2020"
     active_year = requested_year if requested_year in AVAILABLE_YEARS else "2020"
 
-    # 2. Detect the Subject Code by mapping to SUBJECT_MAP;
-    # default to "B01" (Population) if no keywords are found
-    subject_code = None
+    # 2. Detect ALL matching subject codes in the current query
+    matched_codes = []
     for keyword, code in SUBJECT_MAP.items():
-        if (
-            keyword in original_query.lower()
-        ):  # only check current query, not prior context, to avoid misrouting follow-ups that don't explicitly mention the subject
-            subject_code = code
-            break
+        if keyword in original_query.lower():
+            if code not in matched_codes:
+                matched_codes.append(code)
 
-    if subject_code is None:
+    # Fall back to prior or default if nothing matched
+    if not matched_codes:
         subject_code = prior_subject_code or "B01"
+        matched_codes = [subject_code]
 
-    # 3. Construct the table name
-    # SafeGraph Snowflake tables are in the format "YYYY_CBG_SUBJECTCODE"
+    # Primary subject code is still the first match
+    subject_code = matched_codes[0]
+
+    # 3. Construct primary table path
     table_name = f"{active_year}_CBG_{subject_code}"
     full_path = f'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."{table_name}"'
+
+    # Build additional table paths for multi-table queries
+    additional_tables = []
+    if len(matched_codes) > 1:
+        for code in matched_codes[1:]:
+            t_name = f"{active_year}_CBG_{code}"
+            t_path = f'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."{t_name}"'
+            additional_tables.append({"subject_code": code, "table_path": t_path})
 
     if prefetched_fips is None:
         state_abbr, county_name = extract_geo_entities(query)
@@ -109,6 +118,9 @@ def route_query(
     return {
         "table_path": full_path,
         "subject_code": subject_code,
+        "subject_codes": matched_codes,
+        "additional_tables": additional_tables,
+        "is_multi_table": len(matched_codes) > 1,
         "fips_prefix": fips,
         "geo_level": (
             "UNKNOWN" if fips is None else "STATE" if len(str(fips)) == 2 else "COUNTY"
