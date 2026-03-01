@@ -80,6 +80,7 @@ def process_census_query(
         prior_subject_code = last.get("subject_code")
         prior_is_aggregate = last.get("is_aggregate")
         prior_is_median = last.get("is_median")
+        prior_additional_tables = last.get("additional_tables", [])
         prior_context = (
             f"The previous question was: '{last['query']}'. "
             f"It was about Census subject '{prior_subject_code}'. "
@@ -90,6 +91,7 @@ def process_census_query(
         prior_subject_code = None
         prior_is_aggregate = None
         prior_is_median = None
+        prior_additional_tables = []
 
     routing_info = route_query(
         user_input,
@@ -98,6 +100,7 @@ def process_census_query(
         prior_subject_code=prior_subject_code,
         prior_is_aggregate=prior_is_aggregate,
         prior_is_median=prior_is_median,
+        prior_additional_tables=prior_additional_tables,
     )
 
     if verbose:
@@ -153,6 +156,7 @@ def process_census_query(
                 "subject_code": routing_info.get("subject_code"),
                 "is_aggregate": routing_info.get("is_aggregate"),
                 "is_median": routing_info.get("is_median"),
+                "additional_tables": routing_info.get("additional_tables", []),
                 "success": success,
             }
         )

@@ -87,6 +87,34 @@ def get_system_prompt(
     fips = routing_info.get("fips_prefix")
     is_aggregate = routing_info.get("is_aggregate", False)
     is_median = routing_info.get("is_median", False)
+    additional_tables = routing_info.get("additional_tables", [])
+    is_multi_table = routing_info.get("is_multi_table", False)
+
+    # Build schema hints for ALL matched tables
+    additional_hints = ""
+    additional_rules = ""
+    if is_multi_table:
+        for t in additional_tables:
+            code = t["subject_code"]
+            path = t["table_path"]
+            hint = SCHEMA_HINTS.get(code, "")
+            cols = "\n".join(
+                line
+                for line in hint.splitlines()
+                if line.strip().startswith("B") and "e" in line.strip()
+            )
+            additional_hints += f"\nADDITIONAL TABLE: {path}\n{cols}\n"
+            additional_rules += _get_subject_rules(code)
+
+    multi_table_instruction = ""
+    if is_multi_table:
+        paths = [t["table_path"] for t in additional_tables]
+        multi_table_instruction = f"""MULTI-TABLE JOIN RULE:
+This query requires data from multiple tables. Join them on "CENSUS_BLOCK_GROUP":
+Primary table alias: d1 → {table_path}
+{chr(10).join(f'Additional table alias: d{i+2} → {p}' for i, p in enumerate(paths))}
+JOIN ON d1."CENSUS_BLOCK_GROUP" = d2."CENSUS_BLOCK_GROUP"
+Apply the same WHERE clause to all tables."""
 
     # Build intent hint for the LLM
     if is_median:
@@ -168,6 +196,7 @@ Replace REPLACE_WITH_CORRECT_COLUMN with the appropriate column from AVAILABLE C
 QUERY INTENT: {intent_hint}
 {f"PRIOR CONTEXT: {prior_context}" if prior_context else ""}
 {subject_rules}
+{additional_rules}
 
 DATASET CONTEXT:
 - Table: {table_path}
@@ -186,6 +215,7 @@ DATASET CONTEXT:
 
 AVAILABLE COLUMNS — use ONLY these, do not invent others:
 {schema_hint}
+{additional_hints}
 
 GUARDRAILS:
 - ONLY answer questions about US Census demographics (population, income, age,
@@ -201,8 +231,10 @@ GUARDRAILS:
 
 {breakdown_instruction}
 
+{multi_table_instruction}
+
 STRICT OUTPUT RULES:
-1. Use ONLY table: {table_path}
+1. Use {"ONLY table: " + table_path if not is_multi_table else "ONLY the tables listed above — no others"}
 2. ALL column names MUST be in double quotes: "B19013e1"
 3. Wrap numeric columns in ZEROIFNULL() before aggregating
 4. Return ONLY raw SQL — no markdown, no backticks, no comments, no explanation
