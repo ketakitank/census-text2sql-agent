@@ -1,5 +1,34 @@
 from src.database import execute_query
 
+CENSUS_GUARDRAIL_PROMPT = """You are a topic classifier for a US Census data assistant.
+Determine if the following question is related to US Census demographics data.
+Census topics include: population, income, age, race, gender, education, housing, 
+employment, poverty, commute, language, health insurance.
+Respond with ONLY one word: "VALID" or "INVALID"
+Question: {query}"""
+
+def is_census_related(query: str) -> bool:
+    """
+    Uses Snowflake Cortex to determine if the user's query is related to US Census data.
+    This guardrail helps prevent irrelevant or off-topic queries from being processed.
+
+    Args:
+        query (str): The natural language query from the user.
+
+    Returns:
+        bool: True if the query is related to Census data (VALID), False otherwise (INVALID)
+    """
+    prompt = CENSUS_GUARDRAIL_PROMPT.format(query=query.replace("'", "''"))
+    cortex_sql = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-7b', '{prompt}') AS verdict"
+    
+    try:
+        result_df = execute_query(cortex_sql)
+        verdict = result_df.iloc[0, 0].strip().upper()
+        return verdict.startswith("VALID")
+    except Exception as e:
+        print(f"Guardrail check failed: {e}")
+        return True  
+
 def clean_sql(raw_sql: str) -> str:
     """
     Cleans the raw SQL output from the LLM by removing unwanted characters and formatting issues.
@@ -58,3 +87,4 @@ def generate_sql(user_query: str, system_prompt: str) -> str:
     except Exception as e:
         print(f"Cortex Inference Error: {e}")
         return None
+    

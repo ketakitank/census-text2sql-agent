@@ -4,9 +4,16 @@ from src.geography import resolve_fips_prefix
 from src.prompt import get_system_prompt
 from src.agent import generate_sql
 from src.database import execute_query
+from src.agent import is_census_related
 
 def process_census_query(user_input: str, verbose: bool = False) -> None:
     print(f"\n Processing Query: '{user_input}'")
+
+    # 0. Check if query is census-related before anything else
+    if not is_census_related(user_input):
+        print("I can only answer questions about US Census data.")
+        print("Try asking about population, income, housing, education, etc.\n")
+        return
 
     # 1. GEOGRAPHY RESOLUTION
     state_abbr, county_name = extract_geo_entities(user_input)
