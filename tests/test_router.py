@@ -1,26 +1,38 @@
-import pytest
 from unittest.mock import patch
 from src.router import route_query
 
+
 # Helpers
-def make_route(query, prefetched_fips=None, prior_context="", prior_subject_code=None, prior_is_aggregate=None, prior_is_median=None):
+def make_route(
+    query,
+    prefetched_fips=None,
+    prior_context="",
+    prior_subject_code=None,
+    prior_is_aggregate=None,
+    prior_is_median=None,
+):
     return route_query(
         query,
         prefetched_fips=prefetched_fips,
         prior_context=prior_context,
         prior_subject_code=prior_subject_code,
         prior_is_aggregate=prior_is_aggregate,
-        prior_is_median=prior_is_median
+        prior_is_median=prior_is_median,
     )
+
 
 # Year Detection
 class TestYearDetection:
     def test_detects_2020(self):
-        result = make_route("What is the population in CA in 2020?", prefetched_fips="06")
+        result = make_route(
+            "What is the population in CA in 2020?", prefetched_fips="06"
+        )
         assert result["year"] == "2020"
 
     def test_detects_2019(self):
-        result = make_route("What is the population in CA in 2019?", prefetched_fips="06")
+        result = make_route(
+            "What is the population in CA in 2019?", prefetched_fips="06"
+        )
         assert result["year"] == "2019"
 
     def test_defaults_to_2020_when_no_year(self):
@@ -30,6 +42,7 @@ class TestYearDetection:
     def test_out_of_range_year_defaults_to_2020(self):
         result = make_route("Population in CA in 2018?", prefetched_fips="06")
         assert result["year"] == "2020"
+
 
 # Subject Code Detection
 class TestSubjectDetection:
@@ -54,12 +67,19 @@ class TestSubjectDetection:
         assert result["subject_code"] == "B01"
 
     def test_inherits_subject_from_prior(self):
-        result = make_route("What about TX?", prefetched_fips="48", prior_subject_code="B19")
+        result = make_route(
+            "What about TX?", prefetched_fips="48", prior_subject_code="B19"
+        )
         assert result["subject_code"] == "B19"
 
     def test_current_query_overrides_prior_subject(self):
-        result = make_route("What is the population in TX?", prefetched_fips="48", prior_subject_code="B19")
+        result = make_route(
+            "What is the population in TX?",
+            prefetched_fips="48",
+            prior_subject_code="B19",
+        )
         assert result["subject_code"] == "B01"
+
 
 # Aggregate / Median Detection
 class TestAggregateMedianDetection:
@@ -74,26 +94,40 @@ class TestAggregateMedianDetection:
         assert result["is_aggregate"] is False
 
     def test_inherits_aggregate_from_prior(self):
-        result = make_route("What about TX?", prefetched_fips="48", prior_is_aggregate=True)
+        result = make_route(
+            "What about TX?", prefetched_fips="48", prior_is_aggregate=True
+        )
         assert result["is_aggregate"] is True
 
     def test_inherits_median_from_prior(self):
-        result = make_route("What about TX?", prefetched_fips="48", prior_is_median=True)
+        result = make_route(
+            "What about TX?", prefetched_fips="48", prior_is_median=True
+        )
         assert result["is_median"] is True
 
     def test_current_aggregate_overrides_prior_median(self):
-        result = make_route("Total income in TX?", prefetched_fips="48", prior_is_median=True)
+        result = make_route(
+            "Total income in TX?", prefetched_fips="48", prior_is_median=True
+        )
         assert result["is_aggregate"] is True
 
-# Table Path Construction 
+
+# Table Path Construction
 class TestTablePath:
     def test_correct_table_path_for_income_2020(self):
         result = make_route("Total income in CA?", prefetched_fips="06")
-        assert result["table_path"] == 'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."2020_CBG_B19"'
+        assert (
+            result["table_path"]
+            == 'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."2020_CBG_B19"'
+        )
 
     def test_correct_table_path_for_population_2019(self):
         result = make_route("Population in CA in 2019?", prefetched_fips="06")
-        assert result["table_path"] == 'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."2019_CBG_B01"'
+        assert (
+            result["table_path"]
+            == 'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."2019_CBG_B01"'
+        )
+
 
 # Geo Level Detection
 class TestGeoLevel:
@@ -111,6 +145,7 @@ class TestGeoLevel:
                 result = make_route("What is the population?")
                 assert result["geo_level"] == "UNKNOWN"
 
+
 # Testing Prior Context in multi-turn conversations
 class TestPriorContext:
     def test_follow_up_inherits_subject_and_aggregate(self):
@@ -120,11 +155,12 @@ class TestPriorContext:
             prefetched_fips="48",
             prior_context=prior_context,
             prior_subject_code="B19",
-            prior_is_aggregate=True
+            prior_is_aggregate=True,
         )
         assert result["subject_code"] == "B19"
         assert result["is_aggregate"] is True
         assert result["fips_prefix"] == "48"
+
 
 # Edge Cases
 class TestEdgeCases:
@@ -135,7 +171,7 @@ class TestEdgeCases:
     def test_unrecognized_year_defaults_to_2020(self):
         result = make_route("Population in CA in 2018?", prefetched_fips="06")
         assert result["year"] == "2020"  # Defaults to 2020
-    
+
     def test_all_caps_query_matches_keyword(self):
         result = make_route("TOTAL INCOME IN CA", prefetched_fips="06")
         assert result["subject_code"] == "B19"
@@ -145,4 +181,3 @@ class TestEdgeCases:
         result = make_route(long_query, prefetched_fips="06")
         assert result["subject_code"] == "B19"
         assert result["is_aggregate"] is True
-        

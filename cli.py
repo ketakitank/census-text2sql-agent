@@ -1,6 +1,7 @@
 import argparse
 from main import process_census_query
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="=== Census AI Agent: Natural Language to Snowflake SQL ==="
@@ -8,13 +9,11 @@ def main():
     parser.add_argument(
         "query",
         type=str,
-        nargs='?',
-        help="The natural language query (e.g., 'Population of SD in 2020')"
+        nargs="?",
+        help="The natural language query (e.g., 'Population of SD in 2020')",
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose/debug output"
+        "-v", "--verbose", action="store_true", help="Enable verbose/debug output"
     )
 
     args = parser.parse_args()
@@ -37,6 +36,7 @@ def main():
             response = process_census_query(user_q, conversation_history, args.verbose)
             _print_response(response)
 
+
 def _print_response(response: dict) -> None:
     if response["error"]:
         print(f"\nError: {response['error']}\n")
@@ -47,6 +47,7 @@ def _print_response(response: dict) -> None:
         print("Results:")
         print(response["results"])
         print()
+
 
 if __name__ == "__main__":
     main()

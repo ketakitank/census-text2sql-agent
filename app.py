@@ -3,13 +3,12 @@ from main import process_census_query
 import logging
 
 # Configuration of the page
-st.set_page_config(
-    page_title="US Census AI Agent",
-    layout="centered"
-)
+st.set_page_config(page_title="US Census AI Agent", layout="centered")
 
 st.title("US Census AI Agent")
-st.caption("Ask questions about US Census data — population, income, housing, education, and more.")
+st.caption(
+    "Ask questions about US Census data — population, income, housing, education, and more."
+)
 
 # Session state to hold chat history and conversation context
 if "messages" not in st.session_state:
@@ -29,7 +28,9 @@ for msg in st.session_state.messages:
                 st.dataframe(msg["results"], use_container_width=True)
 
 # Chat input for user queries
-if prompt := st.chat_input("Ask a question about US Census data...\nFor example: 'What is the population of California in 2020?'"):
+if prompt := st.chat_input(
+    "Ask a question about US Census data...\nFor example: 'What is the population of California in 2020?'"
+):
 
     # Show user message
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -40,29 +41,34 @@ if prompt := st.chat_input("Ask a question about US Census data...\nFor example:
     with st.chat_message("assistant"):
         with st.spinner("Querying census data..."):
             response = process_census_query(
-                prompt,
-                conversation_history=st.session_state.conversation_history
+                prompt, conversation_history=st.session_state.conversation_history
             )
 
         if response["error"]:
-            logging.error(f"[Census Agent] Query failed: {response['error']}")  # log real error
-            message = f"Something went wrong with your query. Please try again."
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": f"{message}",
-                "sql": response.get("sql"),
-                "results": None
-            })
+            logging.error(
+                f"[Census Agent] Query failed: {response['error']}"
+            )  # log real error
+            message = "Something went wrong with your query. Please try again."
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"{message}",
+                    "sql": response.get("sql"),
+                    "results": None,
+                }
+            )
 
         elif response["answer"] != "success":
             # Guardrail hit or no-data message
             st.markdown(response["answer"])
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": response["answer"],
-                "sql": None,
-                "results": None
-            })
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": response["answer"],
+                    "sql": None,
+                    "results": None,
+                }
+            )
 
         else:
             results = response["results"]
@@ -75,9 +81,11 @@ if prompt := st.chat_input("Ask a question about US Census data...\nFor example:
             with st.expander("View SQL"):
                 st.code(sql, language="sql")
 
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": summary,
-                "sql": sql,
-                "results": results
-            })
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": summary,
+                    "sql": sql,
+                    "results": results,
+                }
+            )

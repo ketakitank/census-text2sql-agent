@@ -17,6 +17,7 @@ A question is INVALID only if it is clearly completely unrelated to census data
 Respond with ONLY one word: "VALID" or "INVALID"
 Question: {query}"""
 
+
 def is_census_related(query: str) -> bool:
     """
     Uses Snowflake Cortex to determine if the user's query is related to US Census data.
@@ -29,15 +30,18 @@ def is_census_related(query: str) -> bool:
         bool: True if the query is related to Census data (VALID), False otherwise (INVALID)
     """
     prompt = CENSUS_GUARDRAIL_PROMPT.format(query=query.replace("'", "''"))
-    cortex_sql = f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-7b', '{prompt}') AS verdict"
-    
+    cortex_sql = (
+        f"SELECT SNOWFLAKE.CORTEX.COMPLETE('mistral-7b', '{prompt}') AS verdict"
+    )
+
     try:
         result_df = execute_query(cortex_sql)
         verdict = result_df.iloc[0, 0].strip().upper()
         return verdict.startswith("VALID")
     except Exception as e:
         print(f"Guardrail check failed: {e}")
-        return True  
+        return True
+
 
 def clean_sql(raw_sql: str) -> str:
     """
@@ -51,18 +55,19 @@ def clean_sql(raw_sql: str) -> str:
     if raw_sql:
         # Handle the literal \n characters
         clean_sql = raw_sql.replace("\\n", "\n")
-        
+
         # Remove any JSON-style wrapping quotes
         clean_sql = clean_sql.strip().strip('"').strip("'")
-        
+
         # Convert escaped quotes \" to "
-        clean_sql = clean_sql.replace('\\"', '"') 
-        
+        clean_sql = clean_sql.replace('\\"', '"')
+
         # Remove Markdown backticks
         clean_sql = clean_sql.replace("```sql", "").replace("```", "")
         return clean_sql.strip()
-    
+
     return None
+
 
 def generate_sql(user_query: str, system_prompt: str) -> str:
     """
@@ -71,7 +76,7 @@ def generate_sql(user_query: str, system_prompt: str) -> str:
     Args:
         user_query (str): The natural language query from the user.
         system_prompt (str): The system instructions for the LLM based on the routed table.
-    
+
     Returns:
         str: The generated SQL query from the LLM.
     """
@@ -81,15 +86,17 @@ def generate_sql(user_query: str, system_prompt: str) -> str:
 
     # Sanitize the prompt to escape single quotes for safe SQL embedding.
     sanitized_prompt = prompt.replace("'", "''")
-    
-    # Using 'mistral-large2' model for SQL generation, which is optimized for code tasks. 
+
+    # Using 'mistral-large2' model for SQL generation, which is optimized for code tasks.
     # The COMPLETE function will return the generated SQL directly.
-    cortex_sql = f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('mistral-large2', '{sanitized_prompt}')"
-    
+    cortex_sql = (
+        f"SELECT SNOWFLAKE.CORTEX.AI_COMPLETE('mistral-large2', '{sanitized_prompt}')"
+    )
+
     try:
         # 1. Execute the Cortex AI_COMPLETE call
         result_df = execute_query(cortex_sql)
-        raw_sql = result_df.iloc[0, 0] 
+        raw_sql = result_df.iloc[0, 0]
 
         # 2. Clean the raw SQL output
         cleaned_sql = clean_sql(raw_sql)
@@ -97,4 +104,3 @@ def generate_sql(user_query: str, system_prompt: str) -> str:
     except Exception as e:
         print(f"Cortex Inference Error: {e}")
         return None
-    
