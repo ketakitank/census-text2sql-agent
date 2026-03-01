@@ -125,3 +125,24 @@ class TestPriorContext:
         assert result["subject_code"] == "B19"
         assert result["is_aggregate"] is True
         assert result["fips_prefix"] == "48"
+
+# Edge Cases
+class TestEdgeCases:
+    def test_unrecognized_subject_defaults_to_population(self):
+        result = make_route("What is the average income in CA?", prefetched_fips="06")
+        assert result["subject_code"] == "B01"  # Defaults to population
+
+    def test_unrecognized_year_defaults_to_2020(self):
+        result = make_route("Population in CA in 2018?", prefetched_fips="06")
+        assert result["year"] == "2020"  # Defaults to 2020
+    
+    def test_all_caps_query_matches_keyword(self):
+        result = make_route("TOTAL INCOME IN CA", prefetched_fips="06")
+        assert result["subject_code"] == "B19"
+
+    def test_very_long_query(self):
+        long_query = "What is the total aggregate household income " * 20 + "in CA?"
+        result = make_route(long_query, prefetched_fips="06")
+        assert result["subject_code"] == "B19"
+        assert result["is_aggregate"] is True
+        
