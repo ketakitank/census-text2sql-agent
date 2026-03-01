@@ -53,11 +53,11 @@ def route_query(query: str, prefetched_fips: str = None, prior_context: str = ""
     """
     # Prepend prior context to the query for better routing
     original_query = query
-    query = f"{prior_context} {query}".strip() if prior_context else query
-    query_lower = query.lower()
+    full_query = f"{prior_context} {query}".strip() if prior_context else query
+    full_query_lower = full_query.lower()
 
     # 1. Detect Year by looking for patterns like "2016", "2017", "2018", "2019", or "2020"
-    year_match = re.search(r"201[6-9]|2020", query_lower)
+    year_match = re.search(r"201[6-9]|2020", full_query_lower)
     requested_year = year_match.group(0) if year_match else "2020"
     
     # Enforce boundaries found during discovery
@@ -87,18 +87,23 @@ def route_query(query: str, prefetched_fips: str = None, prior_context: str = ""
         fips = prefetched_fips 
         
     # Detect aggregate/median — inherit from history if not found in current query
-    current_is_aggregate = any(word in query.lower() for word in AGGREGATE_KEYWORDS)
-    current_is_median    = any(word in query.lower() for word in MEDIAN_KEYWORDS)
+    current_is_aggregate = any(word in full_query_lower for word in AGGREGATE_KEYWORDS)
+    current_is_median    = any(word in full_query_lower for word in MEDIAN_KEYWORDS)
 
+    # Check if prior context indicated aggregate or median intent 
     is_aggregate = current_is_aggregate if current_is_aggregate else (prior_is_aggregate or False)
-    is_median    = current_is_median    if current_is_median    else (prior_is_median    or False)
+    is_median = current_is_median if current_is_median else (prior_is_median or False)
 
     return {
         "table_path": full_path,
         "subject_code": subject_code,
         "year": active_year,
         "fips_prefix": fips, 
-        "geo_level": "UNKNOWN" if fips is None else ("STATE" if len(str(fips)) == 2 else "COUNTY"),
+        "geo_level": (
+            "UNKNOWN" if fips is None
+            else "STATE" if len(str(fips).zfill(2)) <= 2 
+            else "COUNTY"
+        ),
         "is_aggregate": is_aggregate,
         "is_median": is_median
     }

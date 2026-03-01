@@ -4,6 +4,9 @@ from src.geography import resolve_fips_prefix
 from src.prompt import get_system_prompt
 from src.agent import generate_sql, is_census_related
 from src.database import execute_query
+import logging
+
+logger = logging.getLogger(__name__)
 
 def process_census_query(user_input: str, conversation_history: list = None, verbose: bool = False) -> dict:
     """
@@ -33,7 +36,7 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
     state_abbr, county_name = extract_geo_entities(user_input)
 
     if verbose:
-        print(f"DEBUG [Geo]: State='{state_abbr}', County='{county_name}'")
+        logger.debug(f"[Geo Extraction]: State='{state_abbr}', County='{county_name}' from query '{user_input}'")
 
     # If no geo found in current query, look back in conversation history
     if not state_abbr and not county_name:
@@ -42,13 +45,13 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
                 state_abbr = past.get("state")
                 county_name = past.get("county")
                 if verbose:
-                    print(f"DEBUG [Geo fallback from history]: State='{state_abbr}', County='{county_name}'")
+                    logger.debug(f"[Geo Fallback]: Using State='{state_abbr}', County='{county_name}' from prior query '{past['query']}'")
                 break
 
     fips = resolve_fips_prefix(state_abbr, county_name)
 
     if verbose:
-        print(f"DEBUG [FIPS]: '{fips}'")
+        logger.debug(f"[FIPS Resolution]: Resolved FIPS='{fips}' for State='{state_abbr}', County='{county_name}'")
 
     if fips is None:
         return {
@@ -84,12 +87,13 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
     )
 
     if verbose:
-        print(f"DEBUG [Plan]: {routing_info}")
+        logger.debug(f"[Routing Plan]: {routing_info}")
 
+    # 3. PROMPT CONSTRUCTION
     system_prompt = get_system_prompt(routing_info, user_input, prior_context=prior_context)
 
     if verbose:
-        print(f"DEBUG [System Prompt]:\n{'-'*40}\n{system_prompt}\n{'-'*40}")
+        logger.debug(f"[System Prompt]: {system_prompt}")
 
     # 4. SQL GENERATION
     sql = generate_sql(user_input, system_prompt)
@@ -98,7 +102,7 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
         return {"answer": "Failed to generate SQL.", "sql": None, "results": None, "error": None}
 
     if verbose:
-        print(f"DEBUG [SQL]:\n{sql}")
+        logger.debug(f"[Generated SQL]: {sql}")
 
     # 5. EXECUTE
     try:
