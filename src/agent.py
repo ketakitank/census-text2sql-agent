@@ -21,12 +21,11 @@ def clean_sql(raw_sql: str) -> str:
         
         # Remove Markdown backticks
         clean_sql = clean_sql.replace("```sql", "").replace("```", "")
-        
         return clean_sql.strip()
     
     return None
 
-def generate_sql(user_query: str, system_prompt: str):
+def generate_sql(user_query: str, system_prompt: str) -> str:
     """
     Uses Snowflake Cortex to generate SQL. No external API key needed
 

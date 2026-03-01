@@ -1,4 +1,6 @@
 import re
+from src.extractor import extract_geo_entities
+from src.geography import resolve_fips_prefix
 
 # Mapping keywords to the Census Subject Codes based on the Snowflake schema discovered during exploration
 SUBJECT_MAP = {
@@ -20,10 +22,13 @@ SUBJECT_MAP = {
     "veteran": "B21"
 }
 
+AGGREGATE_KEYWORDS = ["total", "sum", "average", "avg", "mean", "aggregate"]
+MEDIAN_KEYWORDS    = ["median"]
+
 # Based on the dataset exploration, the years available to query are 2019 and 2020. 
 AVAILABLE_YEARS = ["2019", "2020"]
 
-def route_query(query: str):
+def route_query(query: str, prefetched_fips: str = None) -> dict:
     """
     Parses user query to determine the target table.
     Defaults to 2020 and Population (B01).
@@ -36,6 +41,10 @@ def route_query(query: str):
             - table_path (str): The fully qualified Snowflake table path.
             - subject_code (str): The detected Census subject code (e.g., "B01").
             - year (str): The year used for the query (e.g., "2020").
+            - fips_prefix (str): The FIPS prefix for geo filtering (e.g., '06' for California).
+            - geo_level (str): The geographic level for filtering ("STATE", "COUNTY", or "UNKNOWN").
+            - is_aggregate (bool): Whether the query is asking for an aggregate statistic (e.g., average, total).
+            - is_median (bool): Whether the query asks for a median value (use AVG(), never SUM()).
     """
     query_lower = query.lower()
 
@@ -60,8 +69,19 @@ def route_query(query: str):
     table_name = f"{active_year}_CBG_{subject_code}"
     full_path = f'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."{table_name}"'
     
+    if prefetched_fips is None:
+        state_abbr, county_name = extract_geo_entities(query)
+        fips = resolve_fips_prefix(state_abbr, county_name)
+    else:
+        fips = prefetched_fips 
+
+
     return {
         "table_path": full_path,
         "subject_code": subject_code,
-        "year": active_year
+        "year": active_year,
+        "fips_prefix": fips, 
+        "geo_level": "UNKNOWN" if fips is None else ("STATE" if len(str(fips)) == 2 else "COUNTY"),
+        "is_aggregate": any(word in query.lower() for word in AGGREGATE_KEYWORDS),
+        "is_median": any(word in query.lower() for word in MEDIAN_KEYWORDS)
     }

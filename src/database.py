@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def execute_query(sql_query: str):
+def execute_query(sql_query: str) -> pd.DataFrame:
     user = os.getenv("SNOWFLAKE_USER")
     raw_password = os.getenv("SNOWFLAKE_PASSWORD")
     account = os.getenv("SNOWFLAKE_ACCOUNT")
