@@ -38,11 +38,10 @@ Results:
 ```
 
 ### 3. Configuration Settings
-
-    Create an `.env` file in the root directory by following [`.env.example`](./.env.example) file
-    ```bash
+Create an `.env` file in the root directory by following [`.env.example`](./.env.example) file
+```
     cp .env.example .env
-    ```
+```
 
 ### 4. Usage 
 
