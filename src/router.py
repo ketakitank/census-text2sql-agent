@@ -232,7 +232,14 @@ def route_query(
     # 5. Build additional_tables by merging inherited tables with any newly detected ones
     # This allows follow-up queries like "and also show employment" to ADD to the existing
     # join context rather than replacing it, while "and in TX?" preserves the full join
-    additional_tables = list(prior_additional_tables) if prior_additional_tables else []
+    # Rebuild paths using active_year to ensure year consistency across all tables in the JOIN
+    additional_tables = []
+    if prior_additional_tables:
+        for t in prior_additional_tables:
+            code = t["subject_code"]
+            t_name = f"{active_year}_CBG_{code}"
+            t_path = f'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."{t_name}"'
+            additional_tables.append({"subject_code": code, "table_path": t_path})
 
     # Track all codes already covered to avoid duplicates
     existing_codes = {subject_code} | {t["subject_code"] for t in additional_tables}
