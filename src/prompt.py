@@ -111,8 +111,8 @@ def get_system_prompt(
         paths = [t["table_path"] for t in additional_tables]
         multi_table_instruction = f"""MULTI-TABLE JOIN RULE:
 This query requires data from multiple tables. Join them on "CENSUS_BLOCK_GROUP":
-Primary table alias: d1 → {table_path}
-{chr(10).join(f'Additional table alias: d{i+2} → {p}' for i, p in enumerate(paths))}
+Primary table alias: d1 => {table_path}
+{chr(10).join(f'Additional table alias: d{i+2} => {p}' for i, p in enumerate(paths))}
 JOIN ON d1."CENSUS_BLOCK_GROUP" = d2."CENSUS_BLOCK_GROUP"
 Apply the same WHERE clause to all tables."""
 
@@ -127,17 +127,25 @@ Apply the same WHERE clause to all tables."""
         )
 
     query_lower = user_query.lower()
-    is_breakdown = any(
+    is_county_breakdown = any(
         p in query_lower
         for p in [
             "per county",
             "by county",
             "each county",
-            "breakdown",
-            "split by",
-            "for each",
+            "all counties",
+            "every county",
         ]
     )
+    is_state_breakdown = any(
+        p in query_lower
+        for p in [
+            "by state",
+            "per state",
+            "all states",
+        ]
+    )
+    is_breakdown = is_county_breakdown or is_state_breakdown
 
     full_hint = SCHEMA_HINTS.get(subject_code, "(no schema hint available)")
     # Strip MOE line to save tokens since MOE columns are not needed for most queries and can be added later
@@ -155,7 +163,13 @@ Apply the same WHERE clause to all tables."""
     geo_instruction = f"""GEOGRAPHIC FILTER (MANDATORY):
 You MUST use exactly this WHERE clause:
 WHERE "CENSUS_BLOCK_GROUP" LIKE '{fips}%'
-This filters to the correct geographic region."""
+This filters to the correct geographic region.
+
+GEOGRAPHIC LEVELS — match the user's intent:
+- User says "block group" or no geographic grouping then return raw rows, LIMIT 1000
+- User says "by county" / "all counties" / "per county" then GROUP BY LEFT("CENSUS_BLOCK_GROUP", 5), 
+- User says "statewide" / "total for CA" then aggregate ALL rows into ONE row, no GROUP BY
+"""
 
     # Aggregation instruction
     agg_instruction = ""
@@ -174,19 +188,23 @@ Add LIMIT 1000 to avoid returning too many rows."""
 
     # Breakdown instruction per county if requested
     breakdown_instruction = ""
-    if is_breakdown:
-        agg_func = "AVG" if is_median else "SUM"
-        metadata_table = 'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."2020_METADATA_CBG_FIPS_CODES"'
+    agg_func = "AVG" if is_median else "SUM"
+    active_year = routing_info.get("year", "2020")
+    metadata_table = f'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."{active_year}_METADATA_CBG_FIPS_CODES"'
+
+    if is_county_breakdown:
         breakdown_instruction = f"""BREAKDOWN RULE:
 The user wants per-county results. Write the SQL in this exact order:
-SELECT m."COUNTY", {agg_func}(ZEROIFNULL(d."REPLACE_WITH_CORRECT_COLUMN")) AS metric
-FROM {table_path} d
-JOIN {metadata_table} m
-ON LEFT(d."CENSUS_BLOCK_GROUP", 5) = (LPAD(m."STATE_FIPS"::STRING, 2, '0') 
-|| LPAD(m."COUNTY_FIPS"::STRING, 3, '0'))
-WHERE d."CENSUS_BLOCK_GROUP" LIKE '{fips}%'
-GROUP BY m."COUNTY"
-ORDER BY m."COUNTY";
+SELECT m."COUNTY", {agg_func}(ZEROIFNULL(d."REPLACE_WITH_CORRECT_COLUMN")) AS metric FROM {table_path} d
+JOIN {metadata_table} m ON LEFT(d."CENSUS_BLOCK_GROUP", 5) = (LPAD(m."STATE_FIPS"::STRING, 2, '0') || LPAD(m."COUNTY_FIPS"::STRING, 3, '0'))
+WHERE d."CENSUS_BLOCK_GROUP" LIKE '{fips}%' GROUP BY m."COUNTY" ORDER BY m."COUNTY";
+Replace REPLACE_WITH_CORRECT_COLUMN with the appropriate column from AVAILABLE COLUMNS above."""
+
+    elif is_state_breakdown:
+        breakdown_instruction = f"""BREAKDOWN RULE:
+The user wants per-state results. Group by the first 2 characters of CENSUS_BLOCK_GROUP.
+SELECT LEFT(d."CENSUS_BLOCK_GROUP", 2) AS state_fips, {agg_func}(ZEROIFNULL(d."REPLACE_WITH_CORRECT_COLUMN")) AS metric
+FROM {table_path} d WHERE d."CENSUS_BLOCK_GROUP" LIKE '{fips}%' GROUP BY state_fips ORDER BY state_fips;
 Replace REPLACE_WITH_CORRECT_COLUMN with the appropriate column from AVAILABLE COLUMNS above."""
 
     subject_rules = _get_subject_rules(subject_code)
