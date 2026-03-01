@@ -57,11 +57,11 @@ def route_query(query: str, prefetched_fips: str = None, prior_context: str = ""
     full_query_lower = full_query.lower()
 
     # 1. Detect Year by looking for patterns like "2016", "2017", "2018", "2019", or "2020"
-    year_match = re.search(r"201[6-9]|2020", full_query_lower)
+    year_match = re.search(r"\b(20\d{2}|19\d{2})\b", original_query.lower())
+    if not year_match:
+        year_match = re.search(r"\b(20\d{2}|19\d{2})\b", full_query_lower)
+    # Check if the detected year is in the available years; if not, default to 2020
     requested_year = year_match.group(0) if year_match else "2020"
-    
-    # Enforce boundaries found during discovery
-    # The dataset only has 2019 and 2020, so if the user asks for a year outside of that, we default to 2020
     active_year = requested_year if requested_year in AVAILABLE_YEARS else "2020"
 
     # 2. Detect the Subject Code by mapping to SUBJECT_MAP; 
@@ -97,13 +97,15 @@ def route_query(query: str, prefetched_fips: str = None, prior_context: str = ""
     return {
         "table_path": full_path,
         "subject_code": subject_code,
-        "year": active_year,
-        "fips_prefix": fips, 
+        "fips_prefix": fips,
         "geo_level": (
             "UNKNOWN" if fips is None
-            else "STATE" if len(str(fips).zfill(2)) <= 2 
+            else "STATE" if len(str(fips)) == 2
             else "COUNTY"
         ),
         "is_aggregate": is_aggregate,
-        "is_median": is_median
+        "is_median": is_median,
+        "year": active_year,                      
+        "requested_year": requested_year,
+        "year_was_changed": active_year != requested_year
     }

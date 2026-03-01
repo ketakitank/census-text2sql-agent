@@ -89,6 +89,19 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
     if verbose:
         logger.debug(f"[Routing Plan]: {routing_info}")
 
+    requested_year = routing_info.get("requested_year", "2020")
+    if routing_info.get("year_was_changed"):
+        return {
+            "answer": (
+                f"Data for {requested_year} is not available. "
+                f"This dataset only contains data for 2019 and 2020. "
+                f"Please ask your question again with one of those years."
+            ),
+            "sql": None,
+            "results": None,
+            "error": None
+        }
+
     # 3. PROMPT CONSTRUCTION
     system_prompt = get_system_prompt(routing_info, user_input, prior_context=prior_context)
 
@@ -123,7 +136,7 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
 
         if results.empty:
             return {"answer": "No data found for this query.", "sql": sql, "results": None, "error": None}
-
+        
         return {"answer": "success", "sql": sql, "results": results, "error": None}
 
     except Exception as e:
