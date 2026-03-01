@@ -3,13 +3,20 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
+import streamlit as st
 
 load_dotenv()
 
+def _get_env(key: str) -> str:
+    try:
+        return st.secrets.get(key) or os.getenv(key)
+    except Exception:
+        return os.getenv(key)
+
 def execute_query(sql_query: str) -> pd.DataFrame:
-    user = os.getenv("SNOWFLAKE_USER")
-    raw_password = os.getenv("SNOWFLAKE_PASSWORD")
-    account = os.getenv("SNOWFLAKE_ACCOUNT")
+    user = _get_env("SNOWFLAKE_USER")
+    raw_password = _get_env("SNOWFLAKE_PASSWORD")
+    account = _get_env("SNOWFLAKE_ACCOUNT")
     
     # 1. URL-encode the password to handle special characters safely
     password = quote_plus(raw_password) if raw_password else ""
@@ -17,9 +24,9 @@ def execute_query(sql_query: str) -> pd.DataFrame:
     # 2. Add all parameters to the URL to avoid the need for manual setup commands
     connection_url = (
         f"snowflake://{user}:{password}@{account}/"
-        f"{os.getenv('SNOWFLAKE_DATABASE')}/{os.getenv('SNOWFLAKE_SCHEMA')}"
-        f"?warehouse={os.getenv('SNOWFLAKE_WAREHOUSE')}"
-        f"&role={os.getenv('SNOWFLAKE_ROLE', 'ACCOUNTADMIN')}" # Optional role
+        f"{_get_env('SNOWFLAKE_DATABASE')}/{_get_env('SNOWFLAKE_SCHEMA')}"
+        f"?warehouse={_get_env('SNOWFLAKE_WAREHOUSE')}"
+        f"&role={_get_env('SNOWFLAKE_ROLE') or 'ACCOUNTADMIN'}"
     )
     
     try:
