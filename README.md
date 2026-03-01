@@ -62,6 +62,12 @@ Create an `.env` file in the root directory by following [`.env.example`](./.env
 streamlit run app.py
 ```
 
+#### Web based interface
+
+Click on [this link](https://census-text2sql-agent.streamlit.app/) and enter the demo password that has been shared with the recruiter on email. 
+
+Please contact ktank@ucsd.edu if you still cannot access this demo.
+
 ---
 
 ## Running Tests
