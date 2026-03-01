@@ -104,12 +104,6 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
     try:
         results = execute_query(sql)
 
-        if not results.empty and "ERROR" in results.columns:
-            return {"answer": results["ERROR"].iloc[0], "sql": sql, "results": None, "error": None}
-
-        if results.empty:
-            return {"answer": "No data found for this query.", "sql": sql, "results": None, "error": None}
-
         # Save geo context for follow-up questions
         conversation_history.append({
             "state": state_abbr,
@@ -119,6 +113,12 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
             "is_aggregate": routing_info.get("is_aggregate"),  
             "is_median": routing_info.get("is_median")         
         })
+
+        if not results.empty and "ERROR" in results.columns:
+            return {"answer": results["ERROR"].iloc[0], "sql": sql, "results": None, "error": None}
+
+        if results.empty:
+            return {"answer": "No data found for this query.", "sql": sql, "results": None, "error": None}
 
         return {"answer": "success", "sql": sql, "results": results, "error": None}
 
