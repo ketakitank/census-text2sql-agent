@@ -1,8 +1,7 @@
-snowflake-connector-python[pandas]
-pandas
-python-dotenv
-streamlit
-ruff
-sqlalchemy
-snowflake-sqlalchemy
-pytest
+pandas==3.0.1
+pytest==9.0.2
+python-dotenv==1.2.1
+ruff==0.15.4
+snowflake-connector-python==4.3.0
+snowflake-sqlalchemy==1.8.2
+streamlit==1.54.0
