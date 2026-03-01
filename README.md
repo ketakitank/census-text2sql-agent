@@ -147,6 +147,12 @@ pytest tests/
 ### 1. Replace keyword mapping with embedding-based routing
 This would ensure synonyms for income like wages etc. would still map to the right subject code using semantic similarity 
 
+For example: 
+
+![Image](./assets/TODO1.png)
+
+I tried to retrive breakdown by counties but since I have mapped it specifically to a list mentioned [in this file](./src/prompt.py) , it only contains breakdown "by county" and not "by counties" when both are semantically same. 
+
 ### 2. ~~Schema Discovery~~
 ~~Currently the routing for subject code is hardcoded, if I had mroe time I would build a route map dynamically (just one time), from the live schema. This way in case new columns are added to the database the agent would stay in sync~~
 
