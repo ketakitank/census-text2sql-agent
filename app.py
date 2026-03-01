@@ -5,6 +5,44 @@ import logging
 # Configuration of the page
 st.set_page_config(page_title="US Census AI Agent", layout="centered")
 
+
+# Add password protection to the app
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == st.secrets["password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.title("US Census AI Agent")
+        st.text_input(
+            "Please enter the demo password",
+            type="password",
+            on_change=password_entered,
+            key="password",
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        st.title("US Census AI Agent")
+        st.text_input(
+            "Please enter the password for the demo",
+            type="password",
+            on_change=password_entered,
+            key="password",
+        )
+        st.error(
+            "Incorrect password, please try again or contact ktank@ucsd.edu for access"
+        )
+        return False
+    return True
+
+
+# Do not render any of the app until the correct password is entered
+if not check_password():
+    st.stop()
+
 st.title("US Census AI Agent")
 st.caption(
     "Ask questions about US Census data — population, income, housing, education, and more."
@@ -28,9 +66,7 @@ for msg in st.session_state.messages:
                 st.dataframe(msg["results"], use_container_width=True)
 
 # Chat input for user queries
-if prompt := st.chat_input(
-    "Ask a question about US Census data...\nFor example: 'What is the population of California in 2020?'"
-):
+if prompt := st.chat_input("'What is the population of California in 2020?'"):
 
     # Show user message
     st.session_state.messages.append({"role": "user", "content": prompt})
