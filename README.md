@@ -25,6 +25,57 @@ Results:
 0       1.462390e+12
 ```
 
+## Flowchart of how it works
+
+```
+User types query in Streamlit UI
+        │
+1. app.py            => validates password, 
+                    captures new user input
+        │
+2. main.py           => orchestrates the full pipeline,
+                    manages conversation history across turns
+                    GUARDRAIL check: is_census_related() check
+                    off-topic queries, NSFW queries are rejected here before
+                    any Snowflake connection is made
+        │
+3. extractor.py      => extracts geography ("CA"), year ("2020")
+                    from natural language using multi-stage parsing
+        │
+4. geography.py      => resolves state/county name => FIPS prefix
+                    e.g. "California" / "CA" => "06"
+        │
+5. router.py         => maps query keywords => Census subject code
+                    e.g. "income" => B19
+                    detects aggregate/median/breakdown intent
+                    detects multi-table queries (e.g. income + race)
+        │
+6. prompt.py         => builds dynamic system prompt with:
+                    - live schema hints from schema_discovery.py
+                    - correct table path 
+                    - FIPS WHERE clause (LIKE '06%')
+                    - geographic level rules (block group / county / state)
+                    - aggregation rules (AVG for medians, SUM for counts)
+                    - multi-table JOIN instructions if needed
+        │
+7. agent.py          => sends system prompt + user query to Cortex (mistral-large2)
+                    post-processes SQL output:
+                      - strips markdown/backticks
+                      - removes escaped quotes        
+        │
+8. database.py       => executes cleaned SQL via SQLAlchemy connection pool
+                    returns pandas DataFrame
+        │
+9. main.py           => updates conversation history
+                    returns { answer, sql, results, routing }
+        │
+10. app.py            => renders assistant response:
+                    - SQL expander (collapsed)
+                    - results dataframe
+```
+
+---
+
 ## Quick Start
 ### 1. Pre-requisites 
     * Python 3.9+
