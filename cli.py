@@ -52,6 +52,11 @@ def _print_response(response: dict) -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        level=(
+            logging.DEBUG
+            if "--verbose" in __import__("sys").argv or "-v" in __import__("sys").argv
+            else logging.INFO
+        ),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     main()
