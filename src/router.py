@@ -28,13 +28,18 @@ MEDIAN_KEYWORDS    = ["median"]
 # Based on the dataset exploration, the years available to query are 2019 and 2020. 
 AVAILABLE_YEARS = ["2019", "2020"]
 
-def route_query(query: str, prefetched_fips: str = None) -> dict:
+def route_query(query: str, prefetched_fips: str = None, prior_context: str = "", prior_subject_code: str = None, prior_is_aggregate: bool = None, prior_is_median: bool = None) -> dict:
     """
     Parses user query to determine the target table.
     Defaults to 2020 and Population (B01).
 
     Args:
         query (str): The natural language query from the user.
+        prefetched_fips (str, optional): A FIPS prefix that has already been resolved from prior context, to avoid redundant extraction. Defaults to None.
+        prior_context (str, optional): Additional context from previous conversation turns that may help with routing decisions. Defaults to "".
+        prior_subject_code (str, optional): The subject code detected in the prior question, which can help maintain consistency in follow-up questions. Defaults to None.
+        prior_is_aggregate (bool, optional): Whether the prior question was detected as an aggregate query, which can help maintain consistency in follow-ups. Defaults to None.
+        prior_is_median (bool, optional): Whether the prior question was detected as a median query, which can help maintain consistency in follow-ups. Defaults to None.
 
     Returns:
         dict: A dictionary containing:
@@ -46,6 +51,9 @@ def route_query(query: str, prefetched_fips: str = None) -> dict:
             - is_aggregate (bool): Whether the query is asking for an aggregate statistic (e.g., average, total).
             - is_median (bool): Whether the query asks for a median value (use AVG(), never SUM()).
     """
+    # Prepend prior context to the query for better routing
+    original_query = query
+    query = f"{prior_context} {query}".strip() if prior_context else query
     query_lower = query.lower()
 
     # 1. Detect Year by looking for patterns like "2016", "2017", "2018", "2019", or "2020"
@@ -58,11 +66,14 @@ def route_query(query: str, prefetched_fips: str = None) -> dict:
 
     # 2. Detect the Subject Code by mapping to SUBJECT_MAP; 
     # default to "B01" (Population) if no keywords are found
-    subject_code = "B01"
+    subject_code = None
     for keyword, code in SUBJECT_MAP.items():
-        if keyword in query_lower:
+        if keyword in original_query.lower():  # only check current query, not prior context, to avoid misrouting follow-ups that don't explicitly mention the subject
             subject_code = code
             break
+
+    if subject_code is None:
+        subject_code = prior_subject_code or "B01"
 
     # 3. Construct the table name
     # SafeGraph Snowflake tables are in the format "YYYY_CBG_SUBJECTCODE"
@@ -74,7 +85,13 @@ def route_query(query: str, prefetched_fips: str = None) -> dict:
         fips = resolve_fips_prefix(state_abbr, county_name)
     else:
         fips = prefetched_fips 
+        
+    # Detect aggregate/median — inherit from history if not found in current query
+    current_is_aggregate = any(word in query.lower() for word in AGGREGATE_KEYWORDS)
+    current_is_median    = any(word in query.lower() for word in MEDIAN_KEYWORDS)
 
+    is_aggregate = current_is_aggregate if current_is_aggregate else (prior_is_aggregate or False)
+    is_median    = current_is_median    if current_is_median    else (prior_is_median    or False)
 
     return {
         "table_path": full_path,
@@ -82,6 +99,6 @@ def route_query(query: str, prefetched_fips: str = None) -> dict:
         "year": active_year,
         "fips_prefix": fips, 
         "geo_level": "UNKNOWN" if fips is None else ("STATE" if len(str(fips)) == 2 else "COUNTY"),
-        "is_aggregate": any(word in query.lower() for word in AGGREGATE_KEYWORDS),
-        "is_median": any(word in query.lower() for word in MEDIAN_KEYWORDS)
+        "is_aggregate": is_aggregate,
+        "is_median": is_median
     }

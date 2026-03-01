@@ -1,9 +1,19 @@
 from src.database import execute_query
 
 CENSUS_GUARDRAIL_PROMPT = """You are a topic classifier for a US Census data assistant.
-Determine if the following question is related to US Census demographics data.
+Determine if the following question is related to US Census demographics data, OR is a follow-up 
+to a census-related conversation.
 Census topics include: population, income, age, race, gender, education, housing, 
 employment, poverty, commute, language, health insurance.
+
+A question is VALID if ANY of these are true:
+- It asks about census demographics directly
+- It mentions a US location (state, county, city)
+- It mentions a year (2019, 2020)
+- It is a short follow-up phrase like "what about X", "how about", "and for", "compare", "in 2019", "what about TX"
+
+A question is INVALID only if it is clearly completely unrelated to census data
+(e.g. cooking recipes, sports scores, personal questions like "what is your name").
 Respond with ONLY one word: "VALID" or "INVALID"
 Question: {query}"""
 

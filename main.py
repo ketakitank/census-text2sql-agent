@@ -2,42 +2,91 @@ from src.router import route_query
 from src.extractor import extract_geo_entities
 from src.geography import resolve_fips_prefix
 from src.prompt import get_system_prompt
-from src.agent import generate_sql
+from src.agent import generate_sql, is_census_related
 from src.database import execute_query
-from src.agent import is_census_related
 
-def process_census_query(user_input: str, verbose: bool = False) -> None:
-    print(f"\n Processing Query: '{user_input}'")
+def process_census_query(user_input: str, conversation_history: list = None, verbose: bool = False) -> dict:
+    """
+    Process a natural language census query and return a response dict.
+    
+    Args:
+        user_input: The natural language query from the user.
+        conversation_history: List of past turns for context (geo fallback).
+        verbose: Enable debug output.
+    
+    Returns:
+        dict with keys: answer, sql, results, error
+    """
+    if conversation_history is None:
+        conversation_history = []
 
-    # 0. Check if query is census-related before anything else
+    # 0. GUARDRAIL
     if not is_census_related(user_input):
-        print("I can only answer questions about US Census data.")
-        print("Try asking about population, income, housing, education, etc.\n")
-        return
+        return {
+            "answer": "I can only answer questions about US Census data (population, income, housing, education, etc.). Please ask a census-related question.",
+            "sql": None,
+            "results": None,
+            "error": None
+        }
 
     # 1. GEOGRAPHY RESOLUTION
     state_abbr, county_name = extract_geo_entities(user_input)
+
+    if verbose:
+        print(f"DEBUG [Geo]: State='{state_abbr}', County='{county_name}'")
+
+    # If no geo found in current query, look back in conversation history
+    if not state_abbr and not county_name:
+        for past in reversed(conversation_history):
+            if past.get("state") or past.get("county"):
+                state_abbr = past.get("state")
+                county_name = past.get("county")
+                if verbose:
+                    print(f"DEBUG [Geo fallback from history]: State='{state_abbr}', County='{county_name}'")
+                break
+
     fips = resolve_fips_prefix(state_abbr, county_name)
 
     if verbose:
-        print(f"DEBUG [Geo]: State='{state_abbr}', County='{county_name}' → FIPS='{fips}'")
+        print(f"DEBUG [FIPS]: '{fips}'")
 
     if fips is None:
-        print(f"  WARNING: Could not resolve FIPS for state='{state_abbr}', county='{county_name}'. Will query all rows.")
-        print("  Aborting — national queries are too expensive. Please specify a state or county.")
-        # For the purpose of this demo, we require a geographic filter to avoid expensive full-table scans. 
-        # In a production system, we could implement 
-        # additional guardrails or optimizations to handle national-level queries more efficiently.
-        return 
-
-    # 2. ROUTING — pass prefetched_fips so route_query skips its own extractor call
-    routing_info = route_query(user_input, prefetched_fips=fips)
+        return {
+            "answer": "Please specify a US state or county in your question (e.g., 'in Texas' or 'in San Diego County').",
+            "sql": None,
+            "results": None,
+            "error": None
+        }
     
+    # 2. Routing; determine subject and query type
+    prior_context = ""
+    prior_subject_code = None
+    prior_is_aggregate = None
+    prior_is_median = None
+    if conversation_history:
+        last = conversation_history[-1]
+        prior_subject_code = last.get("subject_code")
+        prior_is_aggregate = last.get("is_aggregate")
+        prior_is_median    = last.get("is_median")
+        prior_context = (
+            f"The previous question was: '{last['query']}'. "
+            f"It was about Census subject '{prior_subject_code}'. "
+            f"This is a follow-up question."
+        )
+
+    routing_info = route_query(
+        user_input,
+        prefetched_fips=fips,
+        prior_context=prior_context,
+        prior_subject_code=prior_subject_code,
+        prior_is_aggregate=prior_is_aggregate,
+        prior_is_median=prior_is_median
+    )
+
     if verbose:
         print(f"DEBUG [Plan]: {routing_info}")
 
-    # 3. PROMPT GENERATION
-    system_prompt = get_system_prompt(routing_info, user_input)
+    system_prompt = get_system_prompt(routing_info, user_input, prior_context=prior_context)
 
     if verbose:
         print(f"DEBUG [System Prompt]:\n{'-'*40}\n{system_prompt}\n{'-'*40}")
@@ -45,18 +94,33 @@ def process_census_query(user_input: str, verbose: bool = False) -> None:
     # 4. SQL GENERATION
     sql = generate_sql(user_input, system_prompt)
 
-    if sql:
-        print(f" Generated SQL:\n{sql}\n")
-        try:
-            results = execute_query(sql)
-            if not results.empty and "ERROR" in results.columns:
-                print(f" Guardrail Triggered: {results['ERROR'].iloc[0]}")
-            elif results.empty:
-                print(" No data found for this geographic area.")
-            else:
-                print(" Results retrieved successfully:")
-                print(results)
-        except Exception as e:
-            print(f" Snowflake Execution Error: {e}")
-    else:
-        print(" Failed to generate SQL.")
+    if not sql:
+        return {"answer": "Failed to generate SQL.", "sql": None, "results": None, "error": None}
+
+    if verbose:
+        print(f"DEBUG [SQL]:\n{sql}")
+
+    # 5. EXECUTE
+    try:
+        results = execute_query(sql)
+
+        if not results.empty and "ERROR" in results.columns:
+            return {"answer": results["ERROR"].iloc[0], "sql": sql, "results": None, "error": None}
+
+        if results.empty:
+            return {"answer": "No data found for this query.", "sql": sql, "results": None, "error": None}
+
+        # Save geo context for follow-up questions
+        conversation_history.append({
+            "state": state_abbr,
+            "county": county_name,
+            "query": user_input,
+            "subject_code": routing_info.get("subject_code"),
+            "is_aggregate": routing_info.get("is_aggregate"),  
+            "is_median": routing_info.get("is_median")         
+        })
+
+        return {"answer": "success", "sql": sql, "results": results, "error": None}
+
+    except Exception as e:
+        return {"answer": None, "sql": sql, "results": None, "error": str(e)}

@@ -131,7 +131,6 @@ def _extract_via_cortex(user_query: str) -> tuple[str | None, str | None]:
     try:
         res_df = execute_query(sql)
         raw = res_df.iloc[0, 0]
-        print(f"DEBUG [Extractor Cortex raw]: {raw}")
 
         # The LLM might return a JSON string with escaped characters, so we need to unescape it before parsing.
         unescaped = raw.replace('\\"', '"').replace('\\n', '\n')

@@ -65,7 +65,7 @@ AGGREGATION RULES:
   - "B19301e1" is already per capita → use AVG() if aggregating, NEVER SUM()
 """
 
-def get_system_prompt(routing_info: dict, user_query: str = "") -> str:
+def get_system_prompt(routing_info: dict, user_query: str = "", prior_context: str = "") -> str:
     """
     Generates a system prompt for the LLM based on routing information and the user's query.
 
@@ -153,6 +153,7 @@ Replace REPLACE_WITH_CORRECT_COLUMN with the appropriate column from AVAILABLE C
     return f"""You are a Snowflake SQL expert for the SafeGraph US Census dataset.
 
 QUERY INTENT: {intent_hint}
+{f"PRIOR CONTEXT: {prior_context}" if prior_context else ""}
 {income_rules}
 
 DATASET CONTEXT:
