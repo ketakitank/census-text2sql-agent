@@ -61,7 +61,8 @@ def process_census_query(user_input: str, conversation_history: list = None, ver
             "error": None
         }
     
-    # 2. Routing; determine subject and query type
+    # 2. ROUTING: DETERMINE YEAR, SUBJECT, AGGREGATION, ETC. 
+    # FROM PRIOR CONTEXT, IF AVAILABLE, TO HELP WITH FOLLOW-UP QUESTIONS
     prior_context = ""
     prior_subject_code = None
     prior_is_aggregate = None
