@@ -47,7 +47,6 @@ if prompt := st.chat_input("Ask a question about US Census data...\nFor example:
         if response["error"]:
             logging.error(f"[Census Agent] Query failed: {response['error']}")  # log real error
             message = f"Something went wrong with your query. Please try again."
-            st.error(f"Error: {response['error']}")
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": f"{message}",
