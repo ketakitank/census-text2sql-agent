@@ -155,6 +155,10 @@ This would ensure synonyms for income like wages etc. would still map to the rig
 
 ~~To fix this, the router would need to detect when a query spans multiple subject codes (e.g., `B19` for income + `B02` for race) and return all matched codes instead of just one. The system prompt would then instruct the LLM to `JOIN` those tables on their shared `GEOID` column. The main challenge is that the LLM needs to know which columns exist in each table to write a valid join, so this would also depend on having some form of schema discovery (point 2 above) in place first~~
 
-**Strikethroughs Implemented** 
+### 4. Schema hints 
+
+Column-level hints within each table are still hardcoded in [`prompt.py`](./src/prompt.py). If new columns are added to an existing table, the agent won't dynamically pick them up 
+
+### **Strikethroughs Implemented** 
 
 Router can now detect multiple subject codes per query, merges inherited tables across conversation turns, and the prompt injects multi-table JOIN instructions with aliased schema hints 
