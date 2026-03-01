@@ -49,6 +49,8 @@ if prompt := st.chat_input(
                 f"[Census Agent] Query failed: {response['error']}"
             )  # log real error
             message = "Something went wrong with your query. Please try again."
+            # Only show generic error to user, never the raw exception
+            st.error(message)
             st.session_state.messages.append(
                 {
                     "role": "assistant",
