@@ -237,6 +237,20 @@ def route_query(
     # Track all codes already covered to avoid duplicates
     existing_codes = {subject_code} | {t["subject_code"] for t in additional_tables}
 
+    # If the prior subject code is different from the current primary code and not already included,
+    # add it to the join context
+    if (
+        prior_subject_code
+        and prior_subject_code != subject_code
+        and prior_subject_code not in existing_codes
+    ):
+        p_name = f"{active_year}_CBG_{prior_subject_code}"
+        p_path = f'US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET.PUBLIC."{p_name}"'
+        additional_tables.append(
+            {"subject_code": prior_subject_code, "table_path": p_path}
+        )
+        existing_codes.add(prior_subject_code)
+
     # Add any new codes from the current query not already in the join
     if len(matched_codes) > 1:
         for code in matched_codes[1:]:
