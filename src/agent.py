@@ -12,8 +12,10 @@ A question is VALID if ANY of these are true:
 - It mentions a year (2019, 2020)
 - It is a short follow-up phrase like "what about X", "how about", "and for", "compare", "in 2019", "what about TX"
 
-A question is INVALID only if it is clearly completely unrelated to census data
-(e.g. cooking recipes, sports scores, personal questions like "what is your name").
+A question is INVALID if ANY of these are true:
+- It is clearly unrelated to census data (e.g. cooking recipes, sports scores)
+- It is unsafe, harmful, violent, sexual, or offensive in nature
+- It is a personal question about the assistant (e.g. "what is your name")
 Respond with ONLY one word: "VALID" or "INVALID"
 Question: {query}"""
 

@@ -160,16 +160,19 @@ Apply the same WHERE clause to all tables."""
     if not fips:
         raise ValueError("get_system_prompt() called without a FIPS prefix.")
 
-    geo_instruction = f"""GEOGRAPHIC FILTER (MANDATORY):
-You MUST use exactly this WHERE clause:
-WHERE "CENSUS_BLOCK_GROUP" LIKE '{fips}%'
-This filters to the correct geographic region.
-
-GEOGRAPHIC LEVELS — match the user's intent:
-- User says "block group" or no geographic grouping then return raw rows, LIMIT 1000
-- User says "by county" / "all counties" / "per county" then GROUP BY LEFT("CENSUS_BLOCK_GROUP", 5), 
-- User says "statewide" / "total for CA" then aggregate ALL rows into ONE row, no GROUP BY
+    geo_levels = (
+        ""
+        if is_breakdown
+        else """
+GEOGRAPHIC LEVELS:
+- block group / no grouping => raw rows, LIMIT 1000
+- statewide / total => ONE row, no GROUP BY
 """
+    )
+
+    geo_instruction = f"""GEOGRAPHIC FILTER (MANDATORY):
+WHERE "CENSUS_BLOCK_GROUP" LIKE '{fips}%'
+{geo_levels}"""
 
     # Aggregation instruction
     agg_instruction = ""
@@ -209,12 +212,24 @@ Replace REPLACE_WITH_CORRECT_COLUMN with the appropriate column from AVAILABLE C
 
     subject_rules = _get_subject_rules(subject_code)
 
+    sections = "\n".join(
+        filter(
+            None,
+            [
+                geo_instruction,
+                agg_instruction,
+                breakdown_instruction,
+                multi_table_instruction,
+            ],
+        )
+    )
+
     return f"""You are a Snowflake SQL expert for the SafeGraph US Census dataset.
 
 QUERY INTENT: {intent_hint}
 {f"PRIOR CONTEXT: {prior_context}" if prior_context else ""}
 {subject_rules}
-{additional_rules}
+{additional_rules.strip()}
 
 DATASET CONTEXT:
 - Table: {table_path}
@@ -235,21 +250,7 @@ AVAILABLE COLUMNS — use ONLY these, do not invent others:
 {schema_hint}
 {additional_hints}
 
-GUARDRAILS:
-- ONLY answer questions about US Census demographics (population, income, age,
-  race, gender, education, housing, employment, poverty, commute, language).
-- If the question is unrelated to census data, return:
-  SELECT 'Error: Question is outside US Census data scope' AS ERROR
-- If the question is unsafe or NSFW, return:
-  SELECT 'Error: Topic not permitted' AS ERROR
-
-{geo_instruction}
-
-{agg_instruction}
-
-{breakdown_instruction}
-
-{multi_table_instruction}
+{sections}
 
 STRICT OUTPUT RULES:
 1. Use {"ONLY table: " + table_path if not is_multi_table else "ONLY the tables listed above — no others"}
