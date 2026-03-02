@@ -54,10 +54,69 @@ if "messages" not in st.session_state:
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
+
+def render_thought_process(routing, fips, state, county) -> None:
+    """
+    Renders the Thought Process expander for a given response.
+
+    Args:
+        routing (dict): The routing information from the agent's response.
+        fips (str): The FIPS code for the geographic area, if available.
+        state (str): The state abbreviation, if available.
+        county (str): The county name, if available.
+    Returns:
+        None
+    """
+    with st.expander("Thought Process and Reasoning"):
+        subject_code = routing.get("subject_code", "unknown")
+        table_path = routing.get("table_path", "unknown")
+        year = routing.get("year", "unknown")
+        is_aggregate = routing.get("is_aggregate", False)
+        is_median = routing.get("is_median", False)
+        is_multi_table = routing.get("is_multi_table", False)
+        additional_tables = routing.get("additional_tables", [])
+
+        geography_description = f"`{county}, {state}`" if county else f"`{state}`"
+        st.markdown(
+            f"**Geography Resolved** {geography_description}, FIPS code `{fips}`"
+        )
+        st.markdown(f"**Census Subject**: `{subject_code}` (from table `{table_path}`)")
+        st.markdown(f"**Year**: {year}")
+
+        if is_median:
+            intent = "Median value queried, so agent will use `AVG()` on median estimate column"
+        elif is_aggregate:
+            intent = (
+                "Aggregate value queried, so agent will use `SUM()` on estimate column"
+            )
+        else:
+            intent = "Query on row level data, no aggregation function used"
+        st.markdown(f"**Intent**: {intent}")
+
+        if is_multi_table:
+            extra_tables = ", ".join(t["table_path"] for t in additional_tables)
+            st.markdown(
+                f"**Multi-table Query**: Yes, with additional tables `{extra_tables}` joined in"
+            )
+
+        if routing.get("is_county_breakdown"):
+            st.markdown(
+                "**Geographic breakdown:** per-county aggregation via metadata JOIN"
+            )
+        elif routing.get("is_state_breakdown"):
+            st.markdown(
+                "**Geographic breakdown:** per-state aggregation via `LEFT(CENSUS_BLOCK_GROUP, 2)`"
+            )
+
+
 # Render chat messages and any associated SQL or results
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        if msg.get("routing"):
+            render_thought_process(
+                msg["routing"], msg.get("fips"), msg.get("state"), msg.get("county")
+            )
         if msg.get("sql"):
             with st.expander("View SQL"):
                 st.code(msg["sql"], language="sql")
@@ -118,52 +177,9 @@ if prompt := st.chat_input("'What is the population of California in 2020?'"):
             # Add additional context to the summary based on the routing information
             st.markdown(summary)
 
-            # Add an expander to explain the thought process and reasoning behind the agent's actions for this query
-            with st.expander("Thought Process and Reasoning"):
-                fips = response.get("fips", "unknown")
-                state = response.get("state", "unknown")
-                county = response.get("county", None)
-                subject_code = routing.get("subject_code", "unknown")
-                table_path = routing.get("table_path", "unknown")
-                year = routing.get("year", "unknown")
-                is_aggregate = routing.get("is_aggregate", False)
-                is_median = routing.get("is_median", False)
-                is_multi_table = routing.get("is_multi_table", False)
-                additional_tables = routing.get("additional_tables", [])
-
-                geography_description = (
-                    f"`{county}, {state}`" if county else f"`{state}`"
-                )
-                st.markdown(
-                    f"**Geography Resolved** {geography_description}, FIPS code `{fips}`"
-                )
-                st.markdown(
-                    f"**Census Subject**: `{subject_code}` (from table `{table_path}`)"
-                )
-                st.markdown(f"**Year**: {year}")
-                if is_median:
-                    intent = "Median value queried, so agent will use `AVG()` on median estimate column"
-                elif is_aggregate:
-                    intent = "Aggregate value queried, so agent will use `SUM()` on estimate column"
-                else:
-                    intent = "Query on row level data, no aggregation function used"
-
-                st.markdown(f"**Intent**: {intent}")
-
-                if is_multi_table:
-                    extra_tables = ", ".join(t["table_path"] for t in additional_tables)
-                    st.markdown(
-                        f"**Multi-table Query**: Yes, with additional tables `{extra_tables}` joined in"
-                    )
-
-                if routing.get("is_county_breakdown"):
-                    st.markdown(
-                        "**Geographic breakdown:** per-county aggregation via metadata JOIN"
-                    )
-                elif routing.get("is_state_breakdown"):
-                    st.markdown(
-                        "**Geographic breakdown:** per-state aggregation via `LEFT(CENSUS_BLOCK_GROUP, 2)`"
-                    )
+            render_thought_process(
+                msg["routing"], msg.get("fips"), msg.get("state"), msg.get("county")
+            )
 
             st.dataframe(results, use_container_width=True)
             with st.expander("View SQL"):
@@ -175,6 +191,10 @@ if prompt := st.chat_input("'What is the population of California in 2020?'"):
                     "content": summary,
                     "sql": sql,
                     "results": results,
+                    "routing": routing,
+                    "fips": response.get("fips", "unknown"),
+                    "state": response.get("state", "unknown"),
+                    "county": response.get("county", None),
                 }
             )
             st.session_state.conversation_history = response.get(
