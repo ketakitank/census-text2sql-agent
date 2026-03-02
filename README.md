@@ -141,26 +141,29 @@ pytest tests/
 ## Project Structure
 ```
 .
-├── app.py                      # Streamlit web UI entry point containing: chat, thought process, sql, results
-├── cli.py                      # CLI entry point, argument parsing & interactive loop
-├── main.py                     # Core orchestration logic, guardrail triggered & conversation history management
+├── app.py                        # Streamlit web UI entry point containing: chat, thought process, sql, results
+├── cli.py                        # CLI entry point, argument parsing & interactive loop
+├── main.py                       # Core orchestration logic, guardrail triggered & conversation history management
 ├── src/
-│   ├── agent.py                # Cortex AI inference & SQL sanitization
-│   ├── database.py             # SQLAlchemy connection pooling & query execution
-│   ├── extractor.py            # Multi-stage geographic entity extraction
-│   ├── geography.py            # FIPS code resolution for states & counties
-│   ├── router.py               # Heuristic routing to Census subject tables
-│   ├── schema_discovery.py     # Live column fetching from Snowflake (lru_cache)
+│   ├── agent.py                  # Cortex AI inference & SQL sanitization
+│   ├── database.py               # SQLAlchemy connection pooling & query execution
+│   ├── extractor.py              # Multi-stage geographic entity extraction
+│   ├── geography.py              # FIPS code resolution for states & counties
+│   ├── router.py                 # Heuristic routing to Census subject tables
+│   ├── schema_discovery.py       # Live column fetching from Snowflake (lru_cache)
 │   └── prompt/
-│       ├── __init__.py         # Public API — exposes get_system_prompt()
-│       ├── instructions.py     # Geo / agg / breakdown / multi-table instruction builder functions 
-│       ├── rules.py            # SUBJECT_AGG_RULES (B01–B99), SUBJECT_ALIASES
-│       └── sections.py         # Assembles final prompt string
+│       ├── __init__.py           # Public API — exposes get_system_prompt()
+│       ├── instructions.py       # Geo / agg / breakdown / multi-table instruction builder functions 
+│       ├── rules.py              # SUBJECT_AGG_RULES (B01–B99), SUBJECT_ALIASES
+│       └── sections.py           # Assembles final prompt string
 ├── tests/
-│   └── test_router.py          # Unit tests for subject table routing
-├── .env.example                # Template for environment variables
-├── requirements.txt            # Pinned dependencies
-└── .pre-commit-config.yaml     # black + ruff pre-commit hooks
+│   └── test_router.py            # Unit tests for subject table routing
+    └── test_extractor.py         # Unit tests for exttractor function extracting state, county
+    └── test_get_system_prompt.py # Unit tests for getting system prompt
+    └── test_fips_resolver.py     # Unit tests for fips resolver which fetches FIPs code for state and county
+├── .env.example                  # Template for environment variables
+├── requirements.txt              # Pinned dependencies
+└── .pre-commit-config.yaml       # black + ruff pre-commit hooks
 ```
 
 ## Development Process
@@ -269,6 +272,8 @@ I would implement a Semantic Cache using Snowflake Dynamic Tables and Vector Dat
 ### 7. Self correction loop 
 
 I would implement a Self-Correction Loop where, if a Snowflake execution fails, the error message is fed back to the LLM. The AI agent would then analyze the error and rewrite the SQL to retry execution. 
+
+### 8. Add ability to detect multiple locations in query to perform comparison analysis 
 
 ### **Strikethroughs Implemented** 
 

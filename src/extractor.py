@@ -143,7 +143,7 @@ def extract_geo_entities(user_query: str) -> tuple[str | None, str | None]:
         if state_name in query_lower:
             return abbr, None
 
-    # --- Stage 3: Positional abbreviation matching ---
+    # Stage 3: Positional abbreviation matching
     # Only matches abbreviations that FOLLOW a geographic preposition
     # "income in FL in 2019" => matches "in FL" => FL
     # "income in IN in 2019" => matches "in IN" => IN
