@@ -34,49 +34,55 @@ Results:
 ```
 User types query in Streamlit UI
         │
-1. app.py            => validates password, 
-                    captures new user input
+1. app.py               validates password, renders chat UI,
+                        persists Thought Process + SQL + results
+                        across conversation history
         │
-2. main.py           => orchestrates the full pipeline,
-                    manages conversation history across turns
-                    GUARDRAIL check: is_census_related() check
-                    off-topic queries, NSFW queries are rejected here before
-                    any Snowflake connection is made
+2. main.py              orchestrates the full pipeline,
+                        manages conversation history across turns,
+                        GUARDRAIL: is_census_related() fires here —
+                        off-topic and NSFW queries rejected before
+                        any Snowflake connection is made
         │
-3. extractor.py      => extracts geography ("CA"), year ("2020")
-                    from natural language using multi-stage parsing
+3. extractor.py         extracts geography ("CA"), year ("2020")
+                        from natural language using multi-stage parsing
         │
-4. geography.py      => resolves state/county name => FIPS prefix
-                    e.g. "California" / "CA" => "06"
+4. geography.py         resolves state/county name => FIPS prefix
+                        e.g. "California" / "CA" => "06"
         │
-5. router.py         => maps query keywords => Census subject code
-                    e.g. "income" => B19
-                    detects aggregate/median/breakdown intent
-                    detects multi-table queries (e.g. income + race)
+5. router.py            maps query keywords => Census subject code
+                        e.g. "income" => B19
+                        detects aggregate / median / breakdown intent
+                        detects multi-table queries (e.g. income + race)
+                        sets is_county_breakdown / is_state_breakdown flags
         │
-6. prompt.py         => builds dynamic system prompt with:
-                    - live schema hints from schema_discovery.py
-                    - correct table path 
-                    - FIPS WHERE clause (LIKE '06%')
-                    - geographic level rules (block group / county / state)
-                    - aggregation rules (AVG for medians, SUM for counts)
-                    - multi-table JOIN instructions if needed
+6. src/prompt/          builds dynamic system prompt:
+   ├── instructions.py    geo filter, aggregation rules, breakdown SQL template,
+   │                      multi-table JOIN instructions
+   ├── rules.py           SUBJECT_AGG_RULES (all B01–B99 codes),
+   │                      SUBJECT_ALIASES for deterministic column aliasing
+   └── sections.py        assembles final prompt string,
+                          injects live schema hints (estimate columns only)
         │
-7. agent.py          => sends system prompt + user query to Cortex (mistral-large2)
-                    post-processes SQL output:
-                      - strips markdown/backticks
-                      - removes escaped quotes        
+7. agent.py             sends system prompt + user query to
+                        Cortex (mistral-large2) via AI_COMPLETE,
+                        post-processes SQL output:
+                          strips markdown / backticks
+                          removes escaped quotes
         │
-8. database.py       => executes cleaned SQL via SQLAlchemy connection pool
-                    returns pandas DataFrame
+8. database.py          executes cleaned SQL via SQLAlchemy
+                        connection pool, returns pandas DataFrame
         │
-9. main.py           => updates conversation history
-                    returns { answer, sql, results, routing }
+9. main.py              updates conversation history,
+                        returns { answer, sql, results, routing,
+                                  fips, state, county }
         │
-10. app.py            => renders assistant response:
-                    - SQL expander (collapsed)
-                    - results dataframe
+10. app.py              renders assistant response:
+                          Thought Process expander (persists in history)
+                          SQL expander
+                          results dataframe
 ```
+
 
 ---
 
@@ -135,21 +141,26 @@ pytest tests/
 ## Project Structure
 ```
 .
-├── app.py               # Streamlit web UI entry point
-├── cli.py               # CLI entry point, argument parsing & interactive loop
-├── main.py              # Core orchestration logic & conversation history management
+├── app.py                      # Streamlit web UI entry point containing: chat, thought process, sql, results
+├── cli.py                      # CLI entry point, argument parsing & interactive loop
+├── main.py                     # Core orchestration logic, guardrail triggered & conversation history management
 ├── src/
-│   ├── agent.py         # Cortex AI inference, guardrail & SQL sanitization
-│   ├── database.py      # SQLAlchemy connection pooling & query execution
-│   ├── extractor.py     # Multi-stage geographic entity extraction
-│   ├── geography.py     # FIPS code resolution for states & counties
-│   ├── router.py        # Heuristic routing to correct Census subject tables
-│   └── prompt.py        # System prompt engineering & schema hint injection
+│   ├── agent.py                # Cortex AI inference & SQL sanitization
+│   ├── database.py             # SQLAlchemy connection pooling & query execution
+│   ├── extractor.py            # Multi-stage geographic entity extraction
+│   ├── geography.py            # FIPS code resolution for states & counties
+│   ├── router.py               # Heuristic routing to Census subject tables
+│   ├── schema_discovery.py     # Live column fetching from Snowflake (lru_cache)
+│   └── prompt/
+│       ├── __init__.py         # Public API — exposes get_system_prompt()
+│       ├── instructions.py     # Geo / agg / breakdown / multi-table instruction builder functions 
+│       ├── rules.py            # SUBJECT_AGG_RULES (B01–B99), SUBJECT_ALIASES
+│       └── sections.py         # Assembles final prompt string
 ├── tests/
-│   ├── test_router.py   # Unit tests for subject table routing
-├── .env.example         # Template for environment variables
-├── requirements.txt     # Pinned dependencies
-└── .pre-commit-config.yaml  # Ruff linting hooks
+│   └── test_router.py          # Unit tests for subject table routing
+├── .env.example                # Template for environment variables
+├── requirements.txt            # Pinned dependencies
+└── .pre-commit-config.yaml     # black + ruff pre-commit hooks
 ```
 
 ## Development Process
@@ -164,19 +175,30 @@ pytest tests/
 ### 2. Routing Strategy 
 **Keyword to Subject Code Mapping**: I have a semantic routing layer in place to map natural language key words to official subject codes (for eg: `income` => `B19`). This way we dont need to include the entire schema in the LLM window 
 
+**Inherit Context from previous turns**: I impelemented context aware routing by accepting prior subject codes, if the previous turn was an aggregation or median, any prior additional tables relevant to context, from `main.py` for efficient routing
+
+**Multi Table Join Detection**: I have handled this in `router.py` where if the query spans multiple subject codes, additional tables are then merged with prior tables if any, from prior turns (history)
+
 ---
 
-### 3. Prompt Engineering and Guardrails 
+### 3. Prompt Engineering
 
-**Prompt-level SQL rules:** I used the system prompt in prompt.py to force the model to follow Snowflake's specific SQL rules. By telling the LLM exactly how to use double quotes for columns and forbidding markdown in the instructions, I made sure the code comes out ready to run
-
-**Defensive Post-Processing:** Even though I told the LLM not to use markdown, sometimes it still wraps the SQL in triple backticks. To prevent this from breaking the database, I added a cleanup step in agent.py that strips out those extra characters. This ensures the executor always gets a clean SQL string, preventing execution failures
-
-**Applying Guardrails**: I built in "Guardrails" to make sure the agent only answers questions about the US Census data. If a user asks about a different country or a topic that isn't in the dataset, the prompt tells the model to decline the request instead of trying to guess. This stops the agent from making up fake FIPS codes or giving wrong information. The agent also does not answer any question that is deemed not safe for work, none of the queries with such topics are run on the database.
+**Prompt module for generating system prompt**:`src/prompt/` is split into four focused files:
+  - `instructions.py` which builds geo filter, aggregation, breakdown SQL template, and multi-table JOIN instruction strings
+  - `rules.py` which consists of `SUBJECT_AGG_RULES` covering all subject codes `B01`–`B99`, and `SUBJECT_ALIASES` for deterministic column aliasing (e.g. `total_income`) so the LLM never has to infer a meaningful alias
+  - `sections.py` that orchestrates all instruction blocks into the final prompt string, fetches live schema hints via `schema_discovery.py`, and filters to estimate columns only using `re.match(r'^B\d+e\d+')`
+  - `__init__.py` which houses the public API, exposes `get_system_prompt()` so all callers have a single import point
+- `schema_discovery.py` uses `@lru_cache(maxsize=32)` hence Snowflake schema fetch happens once per table per process lifetime
 
 --- 
 
-### 4. Architecture and Inference 
+### 4. Guardrails
+
+**Checks implemented in main.py**: Fired before any snowflake connection is made, where off topic and not safe for work queries are rejected 
+
+**Validation of year**: Any query mentioning years beyond 2020 or before 2019 are flagged as out of scope as the dataset available on Snowflake marketplace doesn't contain data from years before 2019 and after 2020. 
+
+### 5. Architecture and Inference 
 
 **Strategic Transition to Snowflake Cortex:** I moved the project from OpenAI to Snowflake’s native Cortex AI (mistral-large2). I did this for three main reasons:
 - **Data Safety**: it keeps schema metadata within Snowflake
@@ -185,9 +207,12 @@ pytest tests/
 
 **Inference Engine Resilience:** During testing, I ran into some regional errors (Error 100351) where certain models weren't available in my Snowflake region. To fix this, I used mistral-large2 as my primary engine. It’s just as good at writing SQL but is much more reliable across different Snowflake regions, so the app doesn't break depending on where it’s deployed
 
+**Conversation History**: I managed conversation state by passing a conversation_history list into the main pipeline. Instead of using messy global variables, the list is updated in place after every turn. Each entry stores key details like the resolved state, county, and subject codes. If a user asks a follow-up like "What about 2020?", the system looks backward through the history to find the most recent geographic context. 
+
+**Thought Process UI**: To keep the UI consistent, I saved the routing details, FIPS codes, and geographic data directly into each message within the Streamlit session state. I created a helper function called render_thought_process() that handles the display for both new queries and the chat history. This helps the user **trust the AI** by looking at how it is querying through the database.
 ---
 
-### 5. Version Control and Branching Strategy
+### 6. Version Control and Branching Strategy
 
 **Commits format**: I followed the  standard for all my commit messages. This makes the project history a lot easier to read by labeling changes with tags like feat: for new features, fix: for bug fixes, and docs: for documentation
 
@@ -195,9 +220,11 @@ pytest tests/
 
 **Feature Branch Workflow**: Once the basic setup was on the main branch, I moved all new work to separate feature branches. This keeps main stable and ready to run at all times. Riskier changes like prompt engineering were isolated in feature branches before merging
 
+**Precommit checks**: I put some precommit checks in place in the `.pre-commit-config.yaml` file to ensure clean code
+
 ---
 
-### 6. Developer Experience & Security
+### 7. Developer Experience & Security
 **Fail-Fast Credential Loading:** I set up the project to check for all required environment variables right when it starts. This "fail-fast" approach means that if a Snowflake password or username is missing, the app stops immediately and gives a clear error message instead of crashing later with a confusing traceback
 
 **Onboarding via `.env.example`:** A `.env.example` template gives new contributors a clear template for required secrets, making the project easily portable and ensuring sensitive secrets are never committed to version control
@@ -225,6 +252,22 @@ I tried to retrive breakdown by counties but since I have mapped it specifically
 ### 4. Schema hints 
 
 Column-level hints within each table are still hardcoded in [`prompt.py`](./src/prompt.py). If new columns are added to an existing table, the agent won't dynamically pick them up 
+
+### 5. Dynamic Column level hints 
+
+Right now, the column names in `SUBJECT_AGG_RULES` are hardcoded (for example, mapping B19001e14 to the $100k-$125k income bracket). If the dataset is updated or new columns are added, the agent won't know they exist without a manual code change.
+
+To fix this, I would implement a startup check that pulls column descriptions directly from INFORMATION_SCHEMA.COLUMNS. By using those official descriptions to automatically generate the bracket mappings, the agent would stay in sync with the live database and I wouldn't have to maintain these mappings by hand.
+
+### 6. Semantic Result caching
+
+Currently if the user asks "total income in CA for 2020?" and then asks "what is the combined income in CA for the year 2020?"; it would end up querying the db twice when this result can be easily cached and referred to later to answer identical intents 
+
+I would implement a Semantic Cache using Snowflake Dynamic Tables and Vector Data Types. By pre-materializing common query embeddings into a Dynamic Table, the agent could perform a distance-based similarity search to return results for repeated questions instantly
+
+### 7. Self correction loop 
+
+I would implement a Self-Correction Loop where, if a Snowflake execution fails, the error message is fed back to the LLM. The AI agent would then analyze the error and rewrite the SQL to retry execution. 
 
 ### **Strikethroughs Implemented** 
 
