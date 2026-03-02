@@ -6,12 +6,15 @@ Introducing the **Census Text-to-SQL Agent** that translates Natural Language to
 
 
 ## Key Features
-1. Heuristically maps queries to the correct Census Subject Tables and specific years (2019, 2020 available in the marketplace)
-2. Leverages `mistral-large2` via the `SNOWFLAKE.CORTEX.AI_COMPLETE` to ensure performant and safe sql generation
-3. Post processes LLM hallucinated outputs to handle failures when output contains markdown, escaped quotes, newlines etc.
-4. SQLAlchemy Data access ensures robust connection pooling and URL encoded connection handling to prevent failures 
-5. Now preserves context by tracking geography, subject and query intent across follow up questions
-6. Intelligently handles follow up questions that could sound off topic;
+
+1. An interactive chat-based agent that can answer natural language questions based on this data set
+2. Does not hallucinate when off topic questions are asked, does not give answers if the question / query is not related to the dataset or Not safe for work (NSFW)
+3. Heuristically maps queries to the correct Census Subject Tables and specific years (2019, 2020 available in the marketplace)
+4. Leverages `mistral-large2` via the `SNOWFLAKE.CORTEX.AI_COMPLETE` to ensure performant and safe sql generation
+5. Post processes LLM hallucinated outputs to handle failures when output contains markdown, escaped quotes, newlines etc.
+6. SQLAlchemy Data access ensures robust connection pooling and URL encoded connection handling to prevent failures 
+7. Preserves context by tracking geography, subject and query intent across follow up questions
+8. Intelligently handles follow up questions that could sound off topic;
 For eg: 
 ```
 You: What is the total income for CA in 2019? 
@@ -24,6 +27,7 @@ Results:
    total_income_2020
 0       1.462390e+12
 ```
+9. Retrieves results for every query within 60 seconds
 
 ## Flowchart of how it works
 
@@ -78,8 +82,8 @@ User types query in Streamlit UI
 
 ## Quick Start
 ### 1. Pre-requisites 
-    * Python 3.9+
-    * Snowflake account with access to `US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET`
+* Python 3.9+
+* Snowflake account with access to `US_OPEN_CENSUS_DATA__NEIGHBORHOOD_INSIGHTS__FREE_DATASET`
 
 ### 2. Installation Steps
 ``` 
@@ -89,7 +93,7 @@ User types query in Streamlit UI
 ```
 
 ### 3. Configuration Settings
-Create an `.env` file in the root directory by following [`.env.example`](./.env.example) file
+Create an `.env` file in the root directory by following instructions in [`.env.example`](./.env.example) file
 ```
     cp .env.example .env
 ```
@@ -168,7 +172,7 @@ pytest tests/
 
 **Defensive Post-Processing:** Even though I told the LLM not to use markdown, sometimes it still wraps the SQL in triple backticks. To prevent this from breaking the database, I added a cleanup step in agent.py that strips out those extra characters. This ensures the executor always gets a clean SQL string, preventing execution failures
 
-**Applying Guardrails**: I built in "Guardrails" to make sure the agent only answers questions about the US Census data. If a user asks about a different country or a topic that isn't in the dataset, the prompt tells the model to decline the request instead of trying to guess. This stops the agent from making up fake FIPS codes or giving wrong information
+**Applying Guardrails**: I built in "Guardrails" to make sure the agent only answers questions about the US Census data. If a user asks about a different country or a topic that isn't in the dataset, the prompt tells the model to decline the request instead of trying to guess. This stops the agent from making up fake FIPS codes or giving wrong information. The agent also does not answer any question that is deemed not safe for work, none of the queries with such topics are run on the database.
 
 --- 
 
