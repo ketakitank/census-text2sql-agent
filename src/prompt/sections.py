@@ -61,7 +61,7 @@ def build_prompt(routing_info: dict, user_query: str, prior_context: str) -> str
 
     sections = "\n".join(filter(None, [geo, agg, breakdown, multi]))
     subject_rules = get_subject_rules(subject_code)
-    additional_rules = get_additional_rules(subject_code, schema_hint)
+    additional_rules = get_additional_rules(schema_hint)
     additional_hints = (
         "\n".join(load_schema_hints(t["subject_code"]) for t in additional_tables)
         if is_multi_table

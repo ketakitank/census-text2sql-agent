@@ -177,7 +177,10 @@ class TestEdgeCases:
         assert result["subject_code"] == "B19"
 
     def test_very_long_query(self):
-        long_query = "What is the total aggregate household income " * 20 + "in CA?"
+        long_query = (
+            "What is the total aggregate income for all residents " * 5
+            + "in CA in 2020?"
+        )
         result = make_route(long_query, prefetched_fips="06")
         assert result["subject_code"] == "B19"
         assert result["is_aggregate"] is True

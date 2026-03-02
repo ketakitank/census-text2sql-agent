@@ -126,7 +126,7 @@ def _schema_to_hints(schema: dict) -> dict:
 
 
 @lru_cache(maxsize=32)
-def load_schema_hints(force_refresh: bool = False) -> dict:
+def load_schema_hints(subject_code: str, force_refresh: bool = False) -> str:
     """
     Returns SCHEMA_HINTS dict.
     - Loads from cache if available
@@ -134,6 +134,7 @@ def load_schema_hints(force_refresh: bool = False) -> dict:
 
     Args:
         force_refresh (bool): If True, forces fetching live schema from Snowflake even if cache exists. Defaults to False.
+        subject_code (str): The subject code for which to load schema hints (e.g., "B01"). This is used as a key to return the relevant hint string for that subject.
 
     Returns:
         dict: A dictionary where keys are subject codes and values are formatted strings listing the estimate and margin columns, to be included in the LLM prompt as hints.
@@ -142,7 +143,8 @@ def load_schema_hints(force_refresh: bool = False) -> dict:
         logger.debug("Loading schema from cache")
         with open(SCHEMA_CACHE_FILE, "r") as f:
             raw = json.load(f)
-        return _schema_to_hints(raw)
+        hints = _schema_to_hints(raw)
+        return hints.get(subject_code, "")
 
     logger.debug("Fetching live schema from Snowflake...")
     raw = _fetch_live_schema()
@@ -151,4 +153,5 @@ def load_schema_hints(force_refresh: bool = False) -> dict:
         json.dump(raw, f, indent=2)
     logger.debug(f"Schema cached to {SCHEMA_CACHE_FILE}")
 
-    return _schema_to_hints(raw)
+    hints = _schema_to_hints(raw)
+    return hints.get(subject_code, "")

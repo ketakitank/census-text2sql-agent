@@ -87,6 +87,15 @@ STATE_NAME_TO_ABBR = {
 # Create a set of valid state abbreviations for quick lookup in regex stage
 STATE_ABBR_SET = set(STATE_NAME_TO_ABBR.values())
 
+# pattern: "<County Name> County, <Full State Name>"
+county_fullstate_pattern = re.compile(
+    r"(?:in|for|of|from|across|within|at)\s+"
+    r"([A-Za-z]+(?:\s[A-Za-z]+){0,2})"
+    r"\s+County,?\s+"
+    r"([A-Za-z]+(?:\s[A-Za-z]+){0,2})\b",
+    re.IGNORECASE,
+)
+
 # Prepositions that precede a location in natural language
 # "income IN Florida", "population FOR CA", "housing ACROSS TX"
 # This regex looks for these prepositions followed by a 2-letter uppercase word, which is likely a state abbreviation.
@@ -119,6 +128,15 @@ def extract_geo_entities(user_query: str) -> tuple[str | None, str | None]:
     for city, (state, county) in CITY_TO_GEO.items():
         if city in query_lower:
             return state, county
+
+    # If query contains a county followed by a full state name, extract both
+    match = county_fullstate_pattern.search(user_query)
+    if match:
+        county_name = match.group(1).title()
+        state_name = match.group(2).lower()
+        state_abbr = STATE_NAME_TO_ABBR.get(state_name)
+        if state_abbr:
+            return state_abbr, county_name
 
     # Stage 2: Full state name lookup
     for state_name, abbr in STATE_NAME_TO_ABBR.items():
