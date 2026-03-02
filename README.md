@@ -129,6 +129,23 @@ Click on [this link](https://census-text2sql-agent.streamlit.app/) and enter the
 
 Please contact ktank@ucsd.edu if you still cannot access this demo.
 
+#### *Sample queries to test the agent:*
+
+```
+        # should return one row for 2019 year and CA state
+        What is the total income for California in 2019? 
+```
+
+```
+        # should return one row for 2020 year and CA state
+        What about 2020?
+```
+
+```
+        # should hit the guardrails and not answer since it is out of scope
+        Who won the superbowl in 2019?
+```
+
 ---
 
 ## Running Tests
@@ -275,8 +292,14 @@ The current extractor is optimized for single-location lookups. I would expand t
 
 The current sequential chain (Guardrails check then SQL generation and execution) is a good start, but I’d eventually want to use a tool like LangGraph to handle more complex logic. Instead of waiting for the guardrail agent to finish before starting the metadata lookup, I could run them at the same time to speed up the response. This would cut down on the *Time to First Token* and let me build in a loop where the agent can actually look at a SQL error, fix its own code, and try the query again before the user even sees a failure
 
---
+---
 
 ### **Strikethroughs Implemented** 
 
 Router can now detect multiple subject codes per query, merges inherited tables across conversation turns, and the prompt injects multi-table JOIN instructions with aliased schema hints 
+
+--- 
+
+## **Acknowledgments**
+
+I would like to thank the teams at Snowflake for giving my the opportunity to take this assessment and providing the resources to build an AI Agent under 48 hours. This asssessment has been challenging and a great deep-dive into Snowflake's native AI capabilities. Integrating Cortex and Streamlit allowed me to focus on the core logic of the agent rather than managing external infrastructure, and I'm proud of the resilient, multi-turn system I was able to build in such a short sprint 
