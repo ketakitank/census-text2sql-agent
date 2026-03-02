@@ -200,7 +200,3 @@ if prompt := st.chat_input("'What is the population of California in 2020?'"):
                     "county": response.get("county", None),
                 }
             )
-            st.session_state.conversation_history = response.get(
-                "conversation_history",
-                st.session_state.conversation_history,
-            )
