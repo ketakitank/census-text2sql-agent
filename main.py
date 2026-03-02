@@ -192,7 +192,7 @@ def process_census_query(
             "routing": routing_info,
             "state": state_abbr,
             "county": county_name,
-            "fips": fips,
+            "fips": routing_info.get("fips_prefix"),
         }
 
     except Exception as e:
