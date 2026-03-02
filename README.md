@@ -210,6 +210,7 @@ pytest tests/
 **Conversation History**: I managed conversation state by passing a conversation_history list into the main pipeline. Instead of using messy global variables, the list is updated in place after every turn. Each entry stores key details like the resolved state, county, and subject codes. If a user asks a follow-up like "What about 2020?", the system looks backward through the history to find the most recent geographic context. 
 
 **Thought Process UI**: To keep the UI consistent, I saved the routing details, FIPS codes, and geographic data directly into each message within the Streamlit session state. I created a helper function called render_thought_process() that handles the display for both new queries and the chat history. This helps the user **trust the AI** by looking at how it is querying through the database.
+
 ---
 
 ### 6. Version Control and Branching Strategy
