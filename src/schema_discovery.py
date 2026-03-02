@@ -8,6 +8,7 @@ import json
 import os
 import logging
 from src.database import execute_query
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,7 @@ def _schema_to_hints(schema: dict) -> dict:
     return hints
 
 
+@lru_cache(maxsize=32)
 def load_schema_hints(force_refresh: bool = False) -> dict:
     """
     Returns SCHEMA_HINTS dict.
