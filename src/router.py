@@ -192,6 +192,8 @@ def route_query(
             - is_median (bool): Whether the query asks for a median value.
             - requested_year (str): The year parsed from the query (may differ from active_year).
             - year_was_changed (bool): True if the requested year was out of range and defaulted.
+            - is_county_breakdown (bool): Whether the query indicates a county-level breakdown.
+            - is_state_breakdown (bool): Whether the query indicates a state-level breakdown.
     """
     # Prepend prior context to the query for better routing
     original_query = query
@@ -298,4 +300,22 @@ def route_query(
         "year": active_year,
         "requested_year": requested_year,
         "year_was_changed": active_year != requested_year,
+        "is_county_breakdown": any(
+            p in full_query_lower
+            for p in [
+                "per county",
+                "by county",
+                "each county",
+                "all counties",
+                "every county",
+            ]
+        ),
+        "is_state_breakdown": any(
+            p in full_query_lower
+            for p in [
+                "by state",
+                "per state",
+                "all states",
+            ]
+        ),
     }
