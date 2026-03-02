@@ -184,7 +184,16 @@ def process_census_query(
             }
 
         _save_turn(success=True)
-        return {"answer": "success", "sql": sql, "results": results, "error": None}
+        return {
+            "answer": "success",
+            "sql": sql,
+            "results": results,
+            "error": None,
+            "routing": routing_info,
+            "state": state_abbr,
+            "county": county_name,
+            "fips": fips,
+        }
 
     except Exception as e:
         logger.error(f"[Query Execution Error]: {e}", exc_info=True)
