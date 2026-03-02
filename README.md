@@ -251,29 +251,31 @@ I tried to retrive breakdown by counties but since I have mapped it specifically
 ### ~~3. Multi table joins~~
 ~~Currently the agent is unable to query multiple tables, for eg: income for various ethinicites in a particular county or state.~~
 
-~~To fix this, the router would need to detect when a query spans multiple subject codes (e.g., `B19` for income + `B02` for race) and return all matched codes instead of just one. The system prompt would then instruct the LLM to `JOIN` those tables on their shared `GEOID` column. The main challenge is that the LLM needs to know which columns exist in each table to write a valid join, so this would also depend on having some form of schema discovery (point 2 above) in place first~~
+~~To fix this, the router would need to detect when a query spans multiple subject codes (e.g., `B19` for income + `B02` for race) and return all matched codes instead of just one. The system prompt would then instruct the LLM to `JOIN` those tables on their shared `GEOID` column. The main challenge is that the LLM needs to know which columns exist in each table to write a valid join, so this would also depend on having some form of schema discovery (point 2 above) in place first~~ 
 
-### 4. Schema hints 
+### 4. Dynamic Column level hints 
 
-Column-level hints within each table are still hardcoded in [`prompt.py`](./src/prompt.py). If new columns are added to an existing table, the agent won't dynamically pick them up 
+Currently, while table discovery is automated, the specific column mappings (e.g., mapping B19001e14 to the "$100k-$125k" bracket) are maintained in rules.py. I would implement a startup check that pulls column descriptions directly from INFORMATION_SCHEMA.COLUMNS. By using those official metadata descriptions to auto-generate the mappings, the agent would be fully "self-healing" as the Census Bureau updates its datasets.
 
-### 5. Dynamic Column level hints 
-
-Right now, the column names in `SUBJECT_AGG_RULES` are hardcoded (for example, mapping B19001e14 to the $100k-$125k income bracket). If the dataset is updated or new columns are added, the agent won't know they exist without a manual code change.
-
-To fix this, I would implement a startup check that pulls column descriptions directly from INFORMATION_SCHEMA.COLUMNS. By using those official descriptions to automatically generate the bracket mappings, the agent would stay in sync with the live database and I wouldn't have to maintain these mappings by hand.
-
-### 6. Semantic Result caching
+### 5. Semantic Result caching
 
 Currently if the user asks "total income in CA for 2020?" and then asks "what is the combined income in CA for the year 2020?"; it would end up querying the db twice when this result can be easily cached and referred to later to answer identical intents 
 
 I would implement a Semantic Cache using Snowflake Dynamic Tables and Vector Data Types. By pre-materializing common query embeddings into a Dynamic Table, the agent could perform a distance-based similarity search to return results for repeated questions instantly
 
-### 7. Self correction loop 
+### 6. Self correction loop 
 
 I would implement a Self-Correction Loop where, if a Snowflake execution fails, the error message is fed back to the LLM. The AI agent would then analyze the error and rewrite the SQL to retry execution. 
 
-### 8. Add ability to detect multiple locations in query to perform comparison analysis 
+### 7. Add ability to detect multiple locations in query to perform comparison analysis 
+
+The current extractor is optimized for single-location lookups. I would expand the logic to handle comparison intents (e.g., "Compare the median income of San Francisco vs. Seattle"). This would require the agent to resolve multiple FIPS codes simultaneously and generate a UNION or JOIN query to return a side-by-side data visualization.
+
+### 8. Reducing Latency with parallel agents
+
+The current sequential chain (Guardrails check then SQL generation and execution) is a good start, but I’d eventually want to use a tool like LangGraph to handle more complex logic. Instead of waiting for the guardrail agent to finish before starting the metadata lookup, I could run them at the same time to speed up the response. This would cut down on the *Time to First Token* and let me build in a loop where the agent can actually look at a SQL error, fix its own code, and try the query again before the user even sees a failure
+
+--
 
 ### **Strikethroughs Implemented** 
 
