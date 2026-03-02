@@ -178,7 +178,10 @@ if prompt := st.chat_input("'What is the population of California in 2020?'"):
             st.markdown(summary)
 
             render_thought_process(
-                msg["routing"], msg.get("fips"), msg.get("state"), msg.get("county")
+                routing,
+                response.get("fips"),
+                response.get("state"),
+                response.get("county"),
             )
 
             st.dataframe(results, use_container_width=True)
