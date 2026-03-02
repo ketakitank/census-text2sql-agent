@@ -1,4 +1,5 @@
 from src.schema_discovery import load_schema_hints
+import re
 
 # Schema hints are now loaded from the `schema_discovery` module,
 # which fetches live column information from Snowflake on the first run and
@@ -151,9 +152,7 @@ Apply the same WHERE clause to all tables."""
     # Strip MOE line to save tokens since MOE columns are not needed for most queries and can be added later
     # if the user specifically asks about reliability or accuracy.
     schema_hint = "\n".join(
-        line
-        for line in full_hint.splitlines()
-        if line.strip().startswith("B") and "e" in line.strip()
+        line for line in full_hint.splitlines() if re.match(r"^B\d+e\d+", line.strip())
     )
 
     # Checking if a valid FIPS code is provided for geographic filtering
